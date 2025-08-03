@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+/* width */
+/* Modern Light Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+/* Track - the background where the scrollbar moves */
+::-webkit-scrollbar-track {
+    background: #f8fafc;
+    border-radius: 12px;
+    margin: 4px;
+}
+
+/* Handle - the draggable part */
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+    border-radius: 12px;
+    border: 2px solid #f8fafc;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+    border-color: #f1f5f9;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.15);
+    transform: scale(1.05);
+}
+
+/* Handle when being dragged */
+::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Corner where horizontal and vertical scrollbars meet */
+::-webkit-scrollbar-corner {
+    background: #f8fafc;
+}
+
+/* Alternative: Blue accent version */
+/*
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border: 2px solid #f8fafc;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #bfdbfe 0%, #93c5fd 100%);
+}
+
+::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%);
+}
+*/
+
+/* For Firefox (limited support) */
+html {
+    scrollbar-width: thin;
+    scrollbar-color: #e2e8f0 #f8fafc;
+}
+
+@config "../../tailwind.config.js"
+
+
