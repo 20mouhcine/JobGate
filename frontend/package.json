@@ -34,9 +34,11 @@
     "framer-motion": "11.18.2",
     "lucide-react": "^0.534.0",
     "qrcode": "^1.5.4",
+    "quill": "^2.0.3",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-qr-code": "^2.0.18",
+    "react-quill": "^2.0.0",
     "react-router-dom": "6.23.0",
     "tailwind-variants": "2.0.1",
     "tailwindcss": "4.1.11"

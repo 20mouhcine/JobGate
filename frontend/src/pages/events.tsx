@@ -1,7 +1,7 @@
 import DefaultLayout from "@/layouts/default";
 import EventCard from "@/components/eventCard";
 import { useState, useEffect } from "react";
-import { Input, Textarea } from "@heroui/input";
+import { Input } from "@heroui/input";
 import { Button } from "@heroui/button";
 import {
   Modal,
@@ -16,6 +16,9 @@ import { CalendarDate } from "@internationalized/date";
 import { Switch } from "@heroui/switch";
 import { TimeInput } from "@heroui/date-input";
 import { NumberInput } from "@heroui/number-input";
+import ReactQuill from "react-quill";
+import "react-quill/dist/quill.snow.css";
+import { useUser } from "@/contexts/UserContext";
 
 // Define proper types
 interface Event {
@@ -29,10 +32,12 @@ interface Event {
 
 interface FormData {
   title: string;
-  date: CalendarDate | null;
+  start_date: CalendarDate | null;
+  end_date: CalendarDate | null;
   location: string;
   description: string;
   is_timeSlot_enabled: boolean;
+  recruiterId: number | null;
 }
 
 interface TimeSlotFormData {
@@ -45,12 +50,17 @@ export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState(0);
+  const steps = ["Basic info", "description", "Time slots"];
+  const {user} = useUser()
   const [formData, setFormData] = useState<FormData>({
     title: "",
-    date: null,
+    start_date: null,
+    end_date: null,
     location: "",
     description: "",
     is_timeSlot_enabled: false,
+    recruiterId: user?.id || null,
   });
   const [timeSlotData, setTimeSlotData] = useState<TimeSlotFormData>({
     startTime: "",
@@ -60,9 +70,20 @@ export default function EventsPage() {
 
   const apiUrl =
     import.meta.env.VITE_API_URL || "http://localhost:8000/api/events/";
-  const timeSlotApiUrl = 
-    import.meta.env.VITE_TIMESLOT_API_URL || "http://localhost:8000/api/time-slots/";
+  const timeSlotApiUrl =
+    import.meta.env.VITE_TIMESLOT_API_URL ||
+    "http://localhost:8000/api/time-slots/";
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
+
+  // Update recruiterId when user changes
+  useEffect(() => {
+    if (user?.id) {
+      setFormData(prev => ({
+        ...prev,
+        recruiterId: user.id
+      }));
+    }
+  }, [user]);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -99,10 +120,16 @@ export default function EventsPage() {
     }));
   };
 
-  const handleDateChange = (date: CalendarDate | null) => {
+  const handleStartDateChange = (start_date: CalendarDate | null) => {
     setFormData((prev) => ({
       ...prev,
-      date,
+      start_date,
+    }));
+  };
+  const handleEndDateChange = (end_date: CalendarDate | null) => {
+    setFormData((prev) => ({
+      ...prev,
+      end_date,
     }));
   };
 
@@ -111,7 +138,7 @@ export default function EventsPage() {
       ...prev,
       is_timeSlot_enabled: isSelected,
     }));
-    
+
     if (!isSelected) {
       setTimeSlotData({
         startTime: "",
@@ -121,7 +148,10 @@ export default function EventsPage() {
     }
   };
 
-  const handleTimeSlotChange = (field: keyof TimeSlotFormData, value: string | number) => {
+  const handleTimeSlotChange = (
+    field: keyof TimeSlotFormData,
+    value: string | number
+  ) => {
     setTimeSlotData((prev) => ({
       ...prev,
       [field]: value,
@@ -131,14 +161,18 @@ export default function EventsPage() {
   // Handle start time change
   const handleStartTimeChange = (time: any) => {
     // Convert time object to string format (HH:MM)
-    const timeString = time ? `${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}` : "";
+    const timeString = time
+      ? `${String(time.hour).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}`
+      : "";
     handleTimeSlotChange("startTime", timeString);
   };
 
   // Handle end time change
   const handleEndTimeChange = (time: any) => {
     // Convert time object to string format (HH:MM)
-    const timeString = time ? `${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}` : "";
+    const timeString = time
+      ? `${String(time.hour).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}`
+      : "";
     handleTimeSlotChange("endTime", timeString);
   };
 
@@ -148,20 +182,44 @@ export default function EventsPage() {
   };
 
   // Enhanced form validation
+  const isStepValid = (step: number) => {
+    switch (step) {
+      case 0:
+        return (
+          formData.title.trim() !== "" &&
+          formData.location.trim() !== "" &&
+          formData.start_date !== null &&
+          formData.end_date !== null &&
+          formData.recruiterId !== null
+        );
+      case 1:
+        return formData.description.trim() !== "";
+      case 2:
+        if (!formData.is_timeSlot_enabled) return true;
+        return (
+          timeSlotData.startTime !== "" &&
+          timeSlotData.endTime !== "" &&
+          timeSlotData.slot > 0
+        );
+      default:
+        return false;
+    }
+  };
+
   const isFormValid = () => {
-    const basicFieldsValid = (
+    const basicFieldsValid =
       formData.title.trim() !== "" &&
       formData.location.trim() !== "" &&
-      formData.date !== null
-    );
+      formData.start_date !== null &&
+      formData.end_date !== null &&
+      formData.recruiterId !== null;
 
     // If time slots are enabled, validate time slot fields
     if (formData.is_timeSlot_enabled) {
-      const timeSlotFieldsValid = (
+      const timeSlotFieldsValid =
         timeSlotData.startTime !== "" &&
         timeSlotData.endTime !== "" &&
-        timeSlotData.slot > 0
-      );
+        timeSlotData.slot > 0;
       return basicFieldsValid && timeSlotFieldsValid;
     }
 
@@ -182,8 +240,11 @@ export default function EventsPage() {
 
     try {
       // Convert CalendarDate to ISO string for API
-      const dateString = formData.date
-        ? `${formData.date.year}-${String(formData.date.month).padStart(2, "0")}-${String(formData.date.day).padStart(2, "0")}`
+      const start_dateString = formData.start_date
+        ? `${formData.start_date.year}-${String(formData.start_date.month).padStart(2, "0")}-${String(formData.start_date.day).padStart(2, "0")}`
+        : null;
+      const end_dateString = formData.end_date
+        ? `${formData.end_date.year}-${String(formData.end_date.month).padStart(2, "0")}-${String(formData.end_date.day).padStart(2, "0")}`
         : null;
 
       // Step 1: Create the event
@@ -191,8 +252,10 @@ export default function EventsPage() {
         title: formData.title,
         location: formData.location,
         description: formData.description,
-        date: dateString,
+        start_date: start_dateString,
+        end_date: end_dateString,
         is_timeSlot_enabled: formData.is_timeSlot_enabled,
+        recruiterId: formData.recruiterId, // Add recruiterId to the payload
       };
 
       const eventResponse = await fetch(apiUrl, {
@@ -229,7 +292,9 @@ export default function EventsPage() {
           // If time slot creation fails, we should probably delete the event
           // or at least warn the user
           console.error("Failed to create time slots, but event was created");
-          setError("Event created successfully, but failed to create time slots. You can add them later.");
+          setError(
+            "Event created successfully, but failed to create time slots. You can add them later."
+          );
         }
       }
 
@@ -239,10 +304,12 @@ export default function EventsPage() {
       // Reset forms
       setFormData({
         title: "",
-        date: null,
+        start_date: null,
+        end_date: null,
         location: "",
         description: "",
         is_timeSlot_enabled: false,
+        recruiterId: user?.id || null,
       });
       setTimeSlotData({
         startTime: "",
@@ -266,10 +333,12 @@ export default function EventsPage() {
     // Reset forms when modal closes
     setFormData({
       title: "",
-      date: null,
+      start_date: null,
+      end_date: null,
       location: "",
       description: "",
       is_timeSlot_enabled: false,
+      recruiterId: user?.id || null,
     });
     setTimeSlotData({
       startTime: "",
@@ -325,8 +394,8 @@ export default function EventsPage() {
 
           {/* Modal */}
           <Modal isOpen={isOpen} onOpenChange={handleModalClose}>
-            <ModalContent>
-              {(onClose) => (
+            <ModalContent className="max-h-[90vh] overflow-hidden flex flex-col">
+              {() => (
                 <>
                   <ModalHeader className="flex flex-col gap-1">
                     Créer un événement
@@ -334,113 +403,176 @@ export default function EventsPage() {
                       Remplissez les informations de l'événement
                     </span>
                   </ModalHeader>
-                  <ModalBody>
+                  <ModalBody className="overflow-y-auto px-4 flex-1">
                     <form
                       className="flex flex-col gap-4"
                       onSubmit={handleSubmit}
                       id="event-form"
                     >
-                      <Input
-                        label="Event Name"
-                        name="title"
-                        placeholder="Enter event name"
-                        required
-                        value={formData.title}
-                        onChange={handleChange}
-                        isDisabled={isLoading}
-                      />
-                      <DatePicker
-                        label="Date"
-                        value={formData.date}
-                        onChange={handleDateChange}
-                        isDisabled={isLoading}
-                        isRequired
-                      />
-                      <Input
-                        label="Location"
-                        name="location"
-                        placeholder="Enter event location"
-                        required
-                        value={formData.location}
-                        onChange={handleChange}
-                        isDisabled={isLoading}
-                      />
-                      <Textarea
-                        label="Description"
-                        name="description"
-                        placeholder="Enter event description"
-                        value={formData.description}
-                        onChange={handleChange}
-                        isDisabled={isLoading}
-                      />
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          isSelected={formData.is_timeSlot_enabled}
-                          onValueChange={handleSwitchChange}
-                          isDisabled={isLoading}
-                        >
-                          Activer Rdv
-                        </Switch>
-                      </div>
-
-                      {/* Time Slot Configuration */}
-                      {formData.is_timeSlot_enabled && (
-                        <div className="border-t pt-4 mt-2">
-                          <h4 className="text-sm font-medium text-gray-700 mb-3">
-                            Configuration des créneaux horaires
-                          </h4>
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <TimeInput
-                                label="Heure de début"
-                                onChange={handleStartTimeChange}
-                                isDisabled={isLoading}
-                                isRequired
-                                description="Heure de début des rendez-vous"
-                              />
-                              <TimeInput
-                                label="Heure de fin"
-                                onChange={handleEndTimeChange}
-                                isDisabled={isLoading}
-                                isRequired
-                                description="Heure de fin des rendez-vous"
-                              />
+                      {currentStep === 0 && (
+                        <>
+                          <Input
+                            label="Event Name"
+                            name="title"
+                            placeholder="Enter event name"
+                            required
+                            value={formData.title}
+                            onChange={handleChange}
+                            isDisabled={isLoading}
+                          />
+                          <DatePicker
+                            label="Start Date"
+                            value={formData.start_date}
+                            onChange={handleStartDateChange}
+                            isDisabled={isLoading}
+                            isRequired
+                          />
+                          <DatePicker
+                            label="End Date"
+                            value={formData.end_date}
+                            onChange={handleEndDateChange}
+                            isDisabled={isLoading}
+                            isRequired
+                          />
+                          <Input
+                            label="Location"
+                            name="location"
+                            placeholder="Enter event location"
+                            required
+                            value={formData.location}
+                            onChange={handleChange}
+                            isDisabled={isLoading}
+                          />
+                          {/* Display current recruiter (optional) */}
+                          {user && (
+                            <div className="text-sm text-gray-600">
+                              Recruiter: {user.name || user.email || `ID: ${user.id}`}
                             </div>
-                            <NumberInput
-                              label="Durée du créneau (minutes)"
-                              placeholder="10"
-                              value={timeSlotData.slot}
-                              onValueChange={handleSlotChange}
-                              isDisabled={isLoading}
-                              min={5}
-                              max={120}
-                              step={5}
-                              description="Durée de chaque créneau en minutes"
-                            />
-                          </div>
+                          )}
+                        </>
+                      )}
+                      {currentStep === 1 && (
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Description
+                          </label>
+                          <ReactQuill
+                            value={formData.description}
+                            onChange={(value) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                description: value,
+                              }))
+                            }
+                            modules={{
+                              toolbar: {
+                                container: [
+                                  [{ header: [1, 2, false] }],
+                                  ["bold", "italic", "underline", "strike"],
+                                  ["blockquote", "code-block"],
+                                  [{ list: "ordered" }, { list: "bullet" }],
+                                  ["link", "image", "video"],
+                                  ["clean"],
+                                ],
+                              },
+                            }}
+                            formats={[
+                              "header",
+                              "bold",
+                              "italic",
+                              "underline",
+                              "strike",
+                              "blockquote",
+                              "code-block",
+                              "list",
+                              "bullet",
+                              "link",
+                              "image",
+                              "video",
+                            ]}
+                            readOnly={isLoading}
+                          />
                         </div>
+                      )}
+                      {currentStep === 2 && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              isSelected={formData.is_timeSlot_enabled}
+                              onValueChange={handleSwitchChange}
+                              isDisabled={isLoading}
+                            >
+                              Activer Rdv
+                            </Switch>
+                          </div>
+
+                          {/* Time Slot Configuration */}
+                          {formData.is_timeSlot_enabled && (
+                            <div className="border-t pt-4 mt-2">
+                              <h4 className="text-sm font-medium text-gray-700 mb-3">
+                                Configuration des créneaux horaires
+                              </h4>
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <TimeInput
+                                    label="Heure de début"
+                                    onChange={handleStartTimeChange}
+                                    isDisabled={isLoading}
+                                    isRequired
+                                    description="Heure de début des rendez-vous"
+                                  />
+                                  <TimeInput
+                                    label="Heure de fin"
+                                    onChange={handleEndTimeChange}
+                                    isDisabled={isLoading}
+                                    isRequired
+                                    description="Heure de fin des rendez-vous"
+                                  />
+                                </div>
+                                <NumberInput
+                                  label="Durée du créneau (minutes)"
+                                  placeholder="10"
+                                  value={timeSlotData.slot}
+                                  onValueChange={handleSlotChange}
+                                  isDisabled={isLoading}
+                                  min={5}
+                                  max={120}
+                                  step={5}
+                                  description="Durée de chaque créneau en minutes"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                     </form>
                   </ModalBody>
-                  <ModalFooter>
-                    <Button
-                      color="danger"
-                      variant="light"
-                      onPress={onClose}
-                      isDisabled={isLoading}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      form="event-form"
-                      color="primary"
-                      variant="flat"
-                      isLoading={isLoading}
-                      isDisabled={!isFormValid()}
-                    >
-                      {isLoading ? "Creating..." : "Create Event"}
-                    </Button>
+                  <ModalFooter className="sticky bottom-0 bg-white z-10">
+                    {currentStep > 0 && (
+                      <Button onClick={() => setCurrentStep(currentStep - 1)}>
+                        Précédent
+                      </Button>
+                    )}
+                    {currentStep < steps.length - 1 ? (
+                      <Button
+                        onClick={() => setCurrentStep(currentStep + 1)}
+                        isDisabled={!isStepValid(currentStep)}
+                        color="primary"
+                        variant="flat"
+                      >
+                        Suivant
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        form="event-form"
+                        isDisabled={!isFormValid()}
+                        isLoading={isLoading}
+                        color="primary"
+                      >
+                        {isLoading ? "Création..." : "Créer l'événement"}
+                      </Button>
+                    )}
                   </ModalFooter>
                 </>
               )}

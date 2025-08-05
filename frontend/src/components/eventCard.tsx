@@ -8,9 +8,10 @@ export default function EventCard({ event }: { event?: any }) {
     month: "long",
     day: "numeric",
   });
+
   return (
-    <Card className="py-4 min-w-auto">
-      <CardHeader className="pb-0 pt-2 px-4 flex-col items-start">
+    <Card className="flex flex-col justify-between overflow-hidden">
+      <CardHeader className="pb-0 pt-2 px-4 flex-col items-start space-y-1">
         <h4 className="text-tiny uppercase font-bold">
           {event?.title || "title"}
         </h4>
@@ -21,16 +22,20 @@ export default function EventCard({ event }: { event?: any }) {
           {event?.location || "Casablanca"}
         </small>
       </CardHeader>
-      <CardBody className="overflow-visible py-2">
-        <h4 className="font-sans text-gray-600 text-md mb-2">
-          {event?.description || "description description description"}
-        </h4>
-        <p>{event?.is_timeSlot_enabled}</p>
-        <Link to={`/events/${event?.id}`}>
-          <span className="underline flex justify-end text-blue-500 font-light">
-            Voir Plus {">"}
-          </span>
-        </Link>
+
+      <CardBody className="px-4 flex-1 flex flex-col justify-between">
+        <div className="text-gray-600 text-md line-clamp-3"
+        dangerouslySetInnerHTML={{ __html: event?.description || "description description description" }}
+        >
+        </div>
+
+        <div className="flex justify-end">
+          <Link to={`/events/${event?.id}`}>
+            <span className="underline text-blue-500 font-light">
+              Voir Plus &gt;
+            </span>
+          </Link>
+        </div>
       </CardBody>
     </Card>
   );

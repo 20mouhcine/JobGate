@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import EventView, EventDetailView, TalentView,TalentDetailView, ParticipationView, ParticipationDetailView, TimeSlotView
+from .views import EventView, EventDetailView, TalentView,TalentDetailView, ParticipationView, ParticipationDetailView, TimeSlotView, FileUploadView
 
 urlpatterns = [
     path('events/', EventView.as_view(), name='event-list-create'),
@@ -10,6 +10,9 @@ urlpatterns = [
     path('participations-details/', ParticipationDetailView.as_view(), name='participation-detail'),
 
     path('time-slots/', TimeSlotView.as_view(), name='time-slot-list-create'),
+
+    path('upload/', FileUploadView.as_view(), name='file-upload'),
+
 
 
     ]

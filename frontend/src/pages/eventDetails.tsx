@@ -4,12 +4,22 @@ import DefaultLayout from "@/layouts/default";
 import { Users, Download } from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@heroui/button";
+import { useUser } from "@/contexts/UserContext";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+} from "@heroui/modal";
 
 // Move interface outside component for better organization
 interface Event {
   id: string | number;
   title: string; // Changed from title to match your API
-  date: string;
+  start_date: string;
+  end_date: string;
   location: string;
   description: string;
   is_timeSlot_enabled: boolean;
@@ -21,9 +31,105 @@ export default function EventDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const qrCodeRef = useRef<HTMLDivElement>(null);
+  const { user } = useUser();
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
   const apiUrl =
     import.meta.env.VITE_API_URL || "http://localhost:8000/api/events/";
+
+  // CSS styles for proper list rendering
+  const descriptionStyles = `
+    .description-content ul {
+      list-style-type: disc !important;
+      margin-left: 1.5rem !important;
+      margin-bottom: 1rem !important;
+      padding-left: 0.5rem !important;
+    }
+    
+    .description-content ol {
+      list-style-type: decimal !important;
+      margin-left: 1.5rem !important;
+      margin-bottom: 1rem !important;
+      padding-left: 0.5rem !important;
+    }
+    
+    .description-content li {
+      display: list-item !important;
+      margin-bottom: 0.25rem !important;
+      line-height: 1.6 !important;
+    }
+    
+    .description-content ul li {
+      list-style-type: disc !important;
+    }
+    
+    .description-content ol li {
+      list-style-type: decimal !important;
+    }
+    
+    .description-content p {
+      margin-bottom: 0.75rem !important;
+    }
+    
+    .description-content h1 {
+      font-size: 1.5rem !important;
+      font-weight: bold !important;
+      margin-bottom: 1rem !important;
+    }
+    
+    .description-content h2 {
+      font-size: 1.25rem !important;
+      font-weight: 600 !important;
+      margin-bottom: 0.75rem !important;
+    }
+    
+    .description-content h3 {
+      font-size: 1.125rem !important;
+      font-weight: 500 !important;
+      margin-bottom: 0.5rem !important;
+    }
+    
+    .description-content blockquote {
+      border-left: 4px solid #d1d5db !important;
+      padding-left: 1rem !important;
+      font-style: italic !important;
+      color: #6b7280 !important;
+      margin: 1rem 0 !important;
+    }
+    
+    .description-content a {
+      color: #2563eb !important;
+      text-decoration: underline !important;
+    }
+    
+    .description-content a:hover {
+      color: #1d4ed8 !important;
+    }
+    
+    .description-content strong {
+      font-weight: 600 !important;
+    }
+    
+    .description-content em {
+      font-style: italic !important;
+    }
+    
+    .description-content code {
+      background-color: #f3f4f6 !important;
+      padding: 0.125rem 0.25rem !important;
+      border-radius: 0.25rem !important;
+      font-size: 0.875rem !important;
+      font-family: monospace !important;
+    }
+    
+    .description-content pre {
+      background-color: #f3f4f6 !important;
+      padding: 0.75rem !important;
+      border-radius: 0.25rem !important;
+      overflow-x: auto !important;
+      margin: 1rem 0 !important;
+    }
+  `;
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -60,6 +166,35 @@ export default function EventDetailsPage() {
 
     fetchEvent();
   }, [id, apiUrl]); // Added dependencies
+
+  // Function to clean and render HTML content from ReactQuill
+  const renderDescription = (htmlContent: string) => {
+    if (!htmlContent) return null;
+    
+    // Remove empty paragraphs and clean up the HTML
+    const cleanedContent = htmlContent
+      .replace(/<p><br><\/p>/g, '') // Remove empty paragraphs with br
+      .replace(/<p>\s*<\/p>/g, '') // Remove empty paragraphs
+      .trim();
+    
+    if (!cleanedContent || cleanedContent === '<p></p>') {
+      return (
+        <p className="text-gray-500 italic">
+          Aucune description disponible pour cet événement.
+        </p>
+      );
+    }
+
+    return (
+      <>
+        <style dangerouslySetInnerHTML={{ __html: descriptionStyles }} />
+        <div 
+          className="description-content text-gray-700 leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: cleanedContent }}
+        />
+      </>
+    );
+  };
 
   // Function to download QR code as PNG
   const downloadQRCode = () => {
@@ -113,6 +248,27 @@ export default function EventDetailsPage() {
 
     img.src = svgUrl;
   };
+
+  const AnnulerEvenement = async () => {
+    try{
+      const response = await fetch(`${apiUrl}${id}/`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Optionally, you can redirect or show a success message
+      window.location.href = "/events";
+    }catch(error){
+      console.error("Error cancelling event:", error);
+      setError("Failed to cancel the event. Please try again later.");
+    }
+  }
 
   // Loading state
   if (isLoading) {
@@ -186,7 +342,7 @@ export default function EventDetailsPage() {
 
   return (
     <DefaultLayout>
-      <div className="min-h-screen bg-gray-100 py-8 w-full">
+      <div className="min-h-dvh -mt-2 bg-gray-100 py-6 w-full">
         <div className="max-w-6xl mx-auto px-4">
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -200,46 +356,47 @@ export default function EventDetailsPage() {
                   <li>
                     <a
                       href="#about"
-                      className="flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:bg-gray-50 p-2 rounded transition-colors"
+                      className="flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 p-2 rounded transition-colors"
                     >
                       <span>ℹ️</span>À propos
                     </a>
                   </li>
-                  <li>
-                    <a
-                      href="#participants"
-                      className="flex items-center gap-4 text-gray-700 hover:text-blue-600 hover:bg-gray-50 p-2 rounded transition-colors"
-                    >
-                      <span>
-                        <Users />
-                      </span>
-                      Participants
-                    </a>
-                  </li>
-                  
+                  {user && user.role === "recruiter" && (
+                    <li>
+                      <a
+                        href="#participants"
+                        className="flex items-center gap-4 text-gray-700 hover:text-blue-600 hover:bg-blue-50 p-2 rounded transition-colors"
+                      >
+                        <span>
+                          <Users />
+                        </span>
+                        Participants
+                      </a>
+                    </li>
+                  )}
                 </ul>
               </div>
-
               {/* QR Code Section */}
-              <div className="bg-white shadow-md rounded-lg p-6 mt-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4 items-center">
-                    QR Code
-                  </h2>
-                  <Button
-                    onClick={downloadQRCode}
-                    variant="flat"
-                    color="primary"
-                    className="flex items-center gap-2 text-white rounded-md transition-colors"
-                  >
-                    <Download size={16} color="blue" />
-                  </Button>
-                </div>
-                <div className="flex flex-col items-center">
+              {user && user.role === "recruiter" && (
+                <div className="bg-white shadow-md rounded-lg p-6 mt-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-4 items-center">
+                      QR Code
+                    </h2>
+                    <Button
+                      onClick={downloadQRCode}
+                      variant="flat"
+                      color="primary"
+                      className="flex items-center gap-2 text-white rounded-md transition-colors"
+                    >
+                      <Download size={16} color="blue" />
+                    </Button>
+                  </div>
+                  <div ref={qrCodeRef} className="flex flex-col items-center">
                     <QRCode value={`${apiUrl}${event.id}/`} size={128} />
-                  
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Main Content */}
@@ -251,21 +408,59 @@ export default function EventDetailsPage() {
                   </h2>
                   <div className="flex items-center gap-4 mb-4">
                     <span className="text-gray-600">
-                      📅 {formatDate(event.date)}
+                      📅 {formatDate(event.start_date)}
                     </span>
                     <span className="text-gray-600">📍 {event.location}</span>
                   </div>
-                  <div className="prose max-w-none">
-                    {event.description ? (
-                      <p className="text-gray-700 leading-relaxed">
-                        {event.description}
-                      </p>
-                    ) : (
-                      <p className="text-gray-500 italic">
-                        Aucune description disponible pour cet événement.
-                      </p>
-                    )}
+                  
+          
+                  
+                  {/* Rendered description */}
+                  <div className="mb-6">
+                    {renderDescription(event.description)}
                   </div>
+                  
+                  {user && user.role === "talent" ? (
+                    <Button className="mt-4" color="primary" variant="flat">
+                      S'inscrire
+                    </Button>
+                  ) : (
+                    <>
+                      <Button onPress={onOpen} color="danger" variant="flat">
+                        Annuler l'événement
+                      </Button>
+                      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+                        <ModalContent>
+                          {(onClose) => (
+                            <>
+                              <ModalHeader className="flex flex-col gap-1">
+                               Confirmer l'annulation
+                              </ModalHeader>
+                              <ModalBody>
+                                <p>
+                                  Êtes-vous sûr de vouloir annuler cet événement ?
+                                  Cette action est irréversible.
+                                </p>
+                                
+                              </ModalBody>
+                              <ModalFooter>
+                                <Button
+                                  color="danger"
+                                  variant="light"
+                                  onPress={onClose}
+                                >
+                                  Non
+                                </Button>
+                                <Button color="primary" onPress={AnnulerEvenement} variant="flat">
+                                  Oui
+                                </Button>
+                              </ModalFooter>
+                            </>
+                          )}
+                        </ModalContent>
+                      </Modal>
+                    </>
+                  )}
                 </section>
               </div>
             </div>

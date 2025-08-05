@@ -2,8 +2,9 @@ from rest_framework.views import APIView
 from .models import Event, Talent, Participation, TimeSlot
 from .serializers import EventSerializer, TalentSerializer, ParticipationSerializer,TimeSlotSerializer
 from rest_framework.response import Response
-from rest_framework import viewsets
-from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.core.files.storage import default_storage
+
 # Create your views here.
 
 
@@ -234,3 +235,12 @@ class TimeSlotView(APIView):
             return Response(status=204)
         return Response({'detail': 'Time slot not found.'}, status=404)
     
+
+class FileUploadView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, format=None):
+        file_obj = request.FILES['file']
+        file_path = default_storage.save(f"uploads/{file_obj.name}", file_obj)
+        file_url = request.build_absolute_uri(default_storage.url(file_path))
+        return Response({"url": file_url})
