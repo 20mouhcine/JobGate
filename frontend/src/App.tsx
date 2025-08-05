@@ -7,7 +7,9 @@ import BlogPage from "@/pages/blog";
 import AboutPage from "@/pages/about";
 import EventsPage from "@/pages/events";
 import EventDetailsPage from "@/pages/eventDetails";
+import EventsRegister from "./pages/talent/EventsRegister";
 function App() {
+  
   return (
     <Routes>
       <Route element={<IndexPage />} path="/" />
@@ -17,6 +19,7 @@ function App() {
       <Route element={<AboutPage />} path="/about" />
       <Route element={<EventsPage />} path="/events" />
       <Route element={<EventDetailsPage />} path="/events/:id" />
+      <Route element={<EventsRegister />} path="/events/register/:eventId" />
     </Routes>
   );
 }

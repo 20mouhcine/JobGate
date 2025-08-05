@@ -3,6 +3,7 @@ import EventCard from "@/components/eventCard";
 import { useState, useEffect } from "react";
 import { Input, Textarea } from "@heroui/input";
 import { Button } from "@heroui/button";
+
 import {
   Modal,
   ModalContent,
