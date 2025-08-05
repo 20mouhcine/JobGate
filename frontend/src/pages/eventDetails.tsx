@@ -13,6 +13,7 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
+import { form } from "@heroui/theme";
 
 // Move interface outside component for better organization
 interface Event {
@@ -409,6 +410,7 @@ export default function EventDetailsPage() {
                   <div className="flex items-center gap-4 mb-4">
                     <span className="text-gray-600">
                       📅 {formatDate(event.start_date)}
+                          {formatDate(event.end_date)}
                     </span>
                     <span className="text-gray-600">📍 {event.location}</span>
                   </div>

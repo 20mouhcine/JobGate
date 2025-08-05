@@ -7,12 +7,14 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 class Event(models.Model):
     title = models.CharField(max_length=200,null=True)
     image = models.ImageField(upload_to='events/', null=True, blank=True)
+    caption = models.CharField(max_length=500, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     start_date = models.DateTimeField(auto_now=True)
-    end_date = models.DateTimeField(auto_now=True)
+    end_date = models.DateTimeField(blank=True)
     location = models.CharField(max_length=200)
     recruiterId = models.IntegerField(null=True, blank=True)
     is_timeSlot_enabled = models.BooleanField(default=False)
+    is_online = models.BooleanField(default=False)
 
    
 class Talent(models.Model):
