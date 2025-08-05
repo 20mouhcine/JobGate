@@ -63,6 +63,25 @@ html {
     scrollbar-width: thin;
     scrollbar-color: #e2e8f0 #f8fafc;
 }
+@layer components {
+  .underline-dot {
+    @apply relative;
+  }
+
+  .underline-dot::after {
+    content: '';
+    position: absolute;
+    bottom: 0.2rem; /* adjust spacing */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 10px;
+    height: 6px;
+    background-color: currentColor;
+    border-radius: 9999px;
+    top: 30px;
+  }
+}
+
 
 @config "../../tailwind.config.js"
 

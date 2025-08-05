@@ -7,7 +7,7 @@ const NavBar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="fixed top-0 left-0 w-full flex justify-between items-center p-6 shadow-lg z-10 bg-white">
+    <div className="fixed top-0 left-0 w-full flex justify-between items-center p-6 shadow-lg z-50 bg-white overflow-hidden">
       <div className="flex items-center space-x-6">
         {/* Mobile Menu Button - Left of Logo */}
         <button
@@ -39,13 +39,12 @@ const NavBar = () => {
               </a>
             </li>
             <li>
-                <Link
-                    to="/events"
-                    className="text-gray-700 hover:text-blue-500"
-                >
-                    Événements
-                </Link>
-              
+              <Link
+                to="/events"
+                className="text-blue-700 hover:text-blue-500 p-2 rounded transition-colors underline-dot"
+              >
+                Événements
+              </Link>
             </li>
           </ul>
         </nav>
