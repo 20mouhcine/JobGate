@@ -9,12 +9,14 @@ class Event(models.Model):
     image = models.ImageField(upload_to='events/', null=True, blank=True)
     caption = models.CharField(max_length=500, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
-    start_date = models.DateTimeField(auto_now=True)
+    start_date = models.DateTimeField(blank=True)
     end_date = models.DateTimeField(blank=True)
-    location = models.CharField(max_length=200)
+    location = models.CharField(max_length=200,null=True, blank=True)
     recruiterId = models.IntegerField(null=True, blank=True)
     is_timeSlot_enabled = models.BooleanField(default=False)
     is_online = models.BooleanField(default=False)
+    recruiters_number = models.IntegerField(default=1, null=True, blank=True)
+    meeting_link = models.CharField(null=True, blank=True)
 
    
 class Talent(models.Model):

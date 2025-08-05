@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import DefaultLayout from "@/layouts/default";
 import { Users, Download } from "lucide-react";
@@ -13,12 +13,11 @@ import {
   ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
-import { form } from "@heroui/theme";
+import { Input } from "@heroui/input";
 
-// Move interface outside component for better organization
 interface Event {
   id: string | number;
-  title: string; // Changed from title to match your API
+  title: string; 
   start_date: string;
   end_date: string;
   location: string;
@@ -31,9 +30,30 @@ export default function EventDetailsPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRegistered, setIsRegistered] = useState(false);
   const qrCodeRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const navigate = useNavigate();
+
+  const {
+    isOpen: isCvModalOpen,
+    onOpen: onOpenCvModal,
+    onOpenChange: onOpenChangeCvModal,
+    onClose: onCloseCvModal
+  } = useDisclosure();
+
+  const {
+    isOpen: isRegistrationModalOpen,
+    onOpen: onOpenRegistrationModal,
+    onOpenChange: onOpenChangeRegistrationModal,
+    onClose: onCloseRegistrationModal
+  } = useDisclosure();
+  const {
+    isOpen: isConfirmModalOpen,
+    onOpen: onOpenConfirmModal,
+    onClose: onCloseConfirmModal
+  } = useDisclosure();
 
   const apiUrl =
     import.meta.env.VITE_API_URL || "http://localhost:8000/api/events/";
@@ -131,7 +151,11 @@ export default function EventDetailsPage() {
       margin: 1rem 0 !important;
     }
   `;
-
+  useEffect(() => {
+    if (localStorage.getItem(`registered_${id}`)) {
+      setIsRegistered(true)
+    }
+  }, [id]);
   useEffect(() => {
     const fetchEvent = async () => {
       if (!id) {
@@ -146,9 +170,7 @@ export default function EventDetailsPage() {
       try {
         const response = await fetch(`${apiUrl}${id}/`, {
           method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          
         });
 
         if (!response.ok) {
@@ -166,18 +188,83 @@ export default function EventDetailsPage() {
     };
 
     fetchEvent();
-  }, [id, apiUrl]); // Added dependencies
+  }, [id, apiUrl]);
+
+  const handleCvChoice = (choice: 'keep' | 'import') => {
+    onCloseCvModal();
+    if (choice === 'import') {
+      navigate('/profile')
+    }
+    else {
+      onOpenConfirmModal();
+    }
+  };
+  const confirmKeepCv = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/api/talents/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ event: id }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Registration failed");
+      }
+
+      onCloseConfirmModal();
+      setIsRegistered(true);
+      localStorage.setItem(`registered_${id}`, 'true');
+      alert("Inscription réussie avec votre CV actuel !");
+    } catch (error) {
+      console.error("Registration error:", error);
+      alert("Erreur lors de l'inscription");
+    }
+  };
+  const handleRegistrationSubmit = async (formData: any) => {
+    try {
+      const form = new FormData();
+      form.append("first_name", formData.first_name);
+      form.append("last_name", formData.last_name);
+      form.append("email", formData.email);
+      form.append("phone", formData.phone);
+      form.append("resume", formData.resume);
+      form.append("event", id!);
+
+
+      const response = await fetch("http://localhost:8000/api/talents/", {
+        method: "POST",
+        body: form,
+      });
+
+      
+
+      if (!response.ok) {
+        throw new Error("Registration failed");
+      }
+
+
+      onCloseRegistrationModal();
+      alert("Inscription réussie !");
+
+      localStorage.setItem(`registered_${id}`, 'true');
+    } catch (error) {
+      console.error("Registration error:", error);
+      alert("Erreur lors de l'inscription");
+    }
+  };
 
   // Function to clean and render HTML content from ReactQuill
   const renderDescription = (htmlContent: string) => {
     if (!htmlContent) return null;
-    
+
     // Remove empty paragraphs and clean up the HTML
     const cleanedContent = htmlContent
       .replace(/<p><br><\/p>/g, '') // Remove empty paragraphs with br
       .replace(/<p>\s*<\/p>/g, '') // Remove empty paragraphs
       .trim();
-    
+
     if (!cleanedContent || cleanedContent === '<p></p>') {
       return (
         <p className="text-gray-500 italic">
@@ -189,7 +276,7 @@ export default function EventDetailsPage() {
     return (
       <>
         <style dangerouslySetInnerHTML={{ __html: descriptionStyles }} />
-        <div 
+        <div
           className="description-content text-gray-700 leading-relaxed"
           dangerouslySetInnerHTML={{ __html: cleanedContent }}
         />
@@ -251,7 +338,7 @@ export default function EventDetailsPage() {
   };
 
   const AnnulerEvenement = async () => {
-    try{
+    try {
       const response = await fetch(`${apiUrl}${id}/`, {
         method: "DELETE",
         headers: {
@@ -263,13 +350,12 @@ export default function EventDetailsPage() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Optionally, you can redirect or show a success message
       window.location.href = "/events";
-    }catch(error){
+    } catch (error) {
       console.error("Error cancelling event:", error);
       setError("Failed to cancel the event. Please try again later.");
     }
-  }
+  };
 
   // Loading state
   if (isLoading) {
@@ -284,7 +370,6 @@ export default function EventDetailsPage() {
       </DefaultLayout>
     );
   }
-  console.log(event);
 
   // Error state
   if (error) {
@@ -410,23 +495,18 @@ export default function EventDetailsPage() {
                   <div className="flex items-center gap-4 mb-4">
                     <span className="text-gray-600">
                       📅 {formatDate(event.start_date)}
-                          {formatDate(event.end_date)}
+                      {formatDate(event.end_date)}
                     </span>
                     <span className="text-gray-600">📍 {event.location}</span>
                   </div>
-                  
-          
-                  
+
                   {/* Rendered description */}
                   <div className="mb-6">
                     {renderDescription(event.description)}
                   </div>
-                  
-                  {user && user.role === "talent" ? (
-                    <Button className="mt-4" color="primary" variant="flat">
-                      S'inscrire
-                    </Button>
-                  ) : (
+
+                  {/* Updated button section - handles all cases */}
+                  {user?.role === "recruiter" ? (
                     <>
                       <Button onPress={onOpen} color="danger" variant="flat">
                         Annuler l'événement
@@ -436,14 +516,13 @@ export default function EventDetailsPage() {
                           {(onClose) => (
                             <>
                               <ModalHeader className="flex flex-col gap-1">
-                               Confirmer l'annulation
+                                Confirmer l'annulation
                               </ModalHeader>
                               <ModalBody>
                                 <p>
                                   Êtes-vous sûr de vouloir annuler cet événement ?
                                   Cette action est irréversible.
                                 </p>
-                                
                               </ModalBody>
                               <ModalFooter>
                                 <Button
@@ -453,7 +532,11 @@ export default function EventDetailsPage() {
                                 >
                                   Non
                                 </Button>
-                                <Button color="primary" onPress={AnnulerEvenement} variant="flat">
+                                <Button
+                                  color="primary"
+                                  onPress={AnnulerEvenement}
+                                  variant="flat"
+                                >
                                   Oui
                                 </Button>
                               </ModalFooter>
@@ -462,12 +545,157 @@ export default function EventDetailsPage() {
                         </ModalContent>
                       </Modal>
                     </>
+                  ) : (
+                    <Button
+                      className="mt-4"
+                      color="primary"
+                      variant="flat"
+                      isDisabled={isRegistered}
+                      onPress={() => {
+                        if (user?.role === "talent") {
+                          onOpenCvModal();
+                        } else if (!isRegistered) {
+                          onOpenRegistrationModal();
+                        }
+                      }}
+                    >
+                      {isRegistered ? "Déjà inscrit" : "S'inscrire"}
+                    </Button>
                   )}
                 </section>
               </div>
             </div>
           </div>
         </div>
+
+        {/* CV Choice Modal for talent */}
+        <Modal isOpen={isCvModalOpen} onOpenChange={onOpenChangeCvModal}>
+          <ModalContent>
+            <ModalHeader className="flex flex-col gap-1">
+              Choix de CV
+            </ModalHeader>
+            <ModalBody>
+              <p className="text-gray-700">
+                Vous voulez conserver le même CV ou importer un autre ?
+              </p>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                color="primary"
+                variant="flat"
+                onPress={() => handleCvChoice('keep')}
+              >
+                Conserver le même CV
+              </Button>
+              <Button
+                color="secondary"
+                onPress={() => handleCvChoice('import')}
+              >
+                Importer un autre CV
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        {/* Registration Modal for unauthenticated users */}
+        <Modal
+          isOpen={isRegistrationModalOpen}
+          onOpenChange={onOpenChangeRegistrationModal}
+          size="lg"
+        >
+          <ModalContent>
+            <ModalHeader className="flex flex-col gap-1">
+              Inscription à l'événement
+            </ModalHeader>
+            <ModalBody>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target as HTMLFormElement);
+                  handleRegistrationSubmit({
+                    first_name: formData.get("first_name") as string,
+                    last_name: formData.get("last_name") as string,
+                    email: formData.get("email") as string,
+                    phone: formData.get("phone") as string,
+                    resume: formData.get("resume") as File,
+                  });
+                }}
+                className="space-y-4"
+              >
+                <Input
+                  label="Prénom"
+                  name="first_name"
+                  required
+                />
+
+                <Input
+                  label="Nom"
+                  name="last_name"
+                  required
+                />
+
+                <Input
+                  label="Email"
+                  name="email"
+                  type="email"
+                  required
+                />
+
+                <Input
+                  label="Téléphone"
+                  name="phone"
+                  required
+                />
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    CV (PDF, DOC, DOCX)
+                  </label>
+                  <input
+                    type="file"
+                    name="resume"
+                    accept=".pdf,.doc,.docx"
+                    required
+                    className="block w-full text-sm text-gray-700 bg-white border border-gray-300 rounded-md p-2"
+                  />
+                </div>
+
+                <Button type="submit" color="primary">
+                  Soumettre
+                </Button>
+              </form>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+        <Modal isOpen={isConfirmModalOpen} onOpenChange={onCloseConfirmModal}>
+          <ModalContent>
+            <ModalHeader className="flex flex-col gap-1">
+              Confirmer votre choix
+            </ModalHeader>
+            <ModalBody>
+              <p className="text-gray-700">
+                Êtes-vous sûr de vouloir utiliser votre CV actuel ?
+                Cette action est définitive et vous ne pourrez pas modifier
+                votre CV pour cet événement par la suite.
+              </p>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                color="danger"
+                variant="light"
+                onPress={onCloseConfirmModal}
+              >
+                Annuler
+              </Button>
+              <Button
+                color="primary"
+                onPress={confirmKeepCv}
+              >
+                Confirmer
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
       </div>
     </DefaultLayout>
   );

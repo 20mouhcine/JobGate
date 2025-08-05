@@ -5,22 +5,13 @@ import testImage from "../../public/téléchargement.png"
 
 export default function EventCard({ event }: { event?: any }) {
   const start_date = new Date(event?.start_date);
-  const formattedDate = start_date.toLocaleDateString("fr-FR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+
   
   const start_day = start_date.getDate()
   const month = start_date.toLocaleString("fr-FR", { month: "long" });
 
 
   const end_date = new Date(event?.end_date);
-  const formattedEndDate = end_date.toLocaleDateString("fr-FR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
   const end_day = end_date.getDate();
 
 
