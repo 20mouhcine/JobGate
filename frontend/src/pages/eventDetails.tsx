@@ -5,6 +5,8 @@ import { Users, Download } from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@heroui/button";
 import { useUser } from "@/contexts/UserContext";
+import { Tabs, Tab } from "@heroui/tabs";
+import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import {
   Modal,
   ModalContent,
@@ -14,10 +16,12 @@ import {
   useDisclosure,
 } from "@heroui/modal";
 import { Input } from "@heroui/input";
+import { Image as HeroImage } from "@heroui/image";
 
 interface Event {
   id: string | number;
-  title: string; 
+  image?: string;
+  title: string;
   start_date: string;
   end_date: string;
   location: string;
@@ -40,19 +44,19 @@ export default function EventDetailsPage() {
     isOpen: isCvModalOpen,
     onOpen: onOpenCvModal,
     onOpenChange: onOpenChangeCvModal,
-    onClose: onCloseCvModal
+    onClose: onCloseCvModal,
   } = useDisclosure();
 
   const {
     isOpen: isRegistrationModalOpen,
     onOpen: onOpenRegistrationModal,
     onOpenChange: onOpenChangeRegistrationModal,
-    onClose: onCloseRegistrationModal
+    onClose: onCloseRegistrationModal,
   } = useDisclosure();
   const {
     isOpen: isConfirmModalOpen,
     onOpen: onOpenConfirmModal,
-    onClose: onCloseConfirmModal
+    onClose: onCloseConfirmModal,
   } = useDisclosure();
 
   const apiUrl =
@@ -153,7 +157,7 @@ export default function EventDetailsPage() {
   `;
   useEffect(() => {
     if (localStorage.getItem(`registered_${id}`)) {
-      setIsRegistered(true)
+      setIsRegistered(true);
     }
   }, [id]);
   useEffect(() => {
@@ -170,7 +174,6 @@ export default function EventDetailsPage() {
       try {
         const response = await fetch(`${apiUrl}${id}/`, {
           method: "GET",
-          
         });
 
         if (!response.ok) {
@@ -190,12 +193,11 @@ export default function EventDetailsPage() {
     fetchEvent();
   }, [id, apiUrl]);
 
-  const handleCvChoice = (choice: 'keep' | 'import') => {
+  const handleCvChoice = (choice: "keep" | "import") => {
     onCloseCvModal();
-    if (choice === 'import') {
-      navigate('/profile')
-    }
-    else {
+    if (choice === "import") {
+      navigate("/profile");
+    } else {
       onOpenConfirmModal();
     }
   };
@@ -215,7 +217,7 @@ export default function EventDetailsPage() {
 
       onCloseConfirmModal();
       setIsRegistered(true);
-      localStorage.setItem(`registered_${id}`, 'true');
+      localStorage.setItem(`registered_${id}`, "true");
       alert("Inscription réussie avec votre CV actuel !");
     } catch (error) {
       console.error("Registration error:", error);
@@ -232,23 +234,19 @@ export default function EventDetailsPage() {
       form.append("resume", formData.resume);
       form.append("event", id!);
 
-
       const response = await fetch("http://localhost:8000/api/talents/", {
         method: "POST",
         body: form,
       });
 
-      
-
       if (!response.ok) {
         throw new Error("Registration failed");
       }
 
-
       onCloseRegistrationModal();
       alert("Inscription réussie !");
 
-      localStorage.setItem(`registered_${id}`, 'true');
+      localStorage.setItem(`registered_${id}`, "true");
     } catch (error) {
       console.error("Registration error:", error);
       alert("Erreur lors de l'inscription");
@@ -261,11 +259,11 @@ export default function EventDetailsPage() {
 
     // Remove empty paragraphs and clean up the HTML
     const cleanedContent = htmlContent
-      .replace(/<p><br><\/p>/g, '') // Remove empty paragraphs with br
-      .replace(/<p>\s*<\/p>/g, '') // Remove empty paragraphs
+      .replace(/<p><br><\/p>/g, "") // Remove empty paragraphs with br
+      .replace(/<p>\s*<\/p>/g, "") // Remove empty paragraphs
       .trim();
 
-    if (!cleanedContent || cleanedContent === '<p></p>') {
+    if (!cleanedContent || cleanedContent === "<p></p>") {
       return (
         <p className="text-gray-500 italic">
           Aucune description disponible pour cet événement.
@@ -429,12 +427,267 @@ export default function EventDetailsPage() {
   return (
     <DefaultLayout>
       <div className="min-h-dvh -mt-2 bg-gray-100 py-6 w-full">
+        <div className="fixed left-0 top-1/2 -translate-y-1/2 z-50 ">
+          <Popover placement="left">
+            <PopoverTrigger className="bg-blue-600 p-2 rounded-full text-white hover:bg-blue-700 transition-colors font-bold">
+              <div className="flex flex-col items-center">
+
+              <span className="sr-only">QR Code</span>
+              
+                      
+                      <button
+                        onClick={downloadQRCode}
+                        color="primary"
+                        className="flex items-center  text-white rounded-md transition-colors"
+                      >
+                        <Download size={16} color="blue" />
+                      </button>
+              </div>
+            </PopoverTrigger>
+            <PopoverContent className="mt-2">
+              <div className="px-1 py-2">
+                <div className="text-small font-bold">Qr</div>
+                <div className="text-tiny">
+                    
+                    <div ref={qrCodeRef} className="flex flex-col items-center">
+                      <QRCode value={`${apiUrl}${event.id}/`} size={128} />
+                    </div>
+                  </div>
+                </div>
+            </PopoverContent>
+          </Popover>
+        </div>
         <div className="max-w-6xl mx-auto px-4">
           {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="flex flex-col justify-center items-center gap-6">
+            <div className="flex w-full flex-col justify-center items-center">
+              {user && user.role === "recruiter" ? (
+                <Tabs aria-label="Options" color="primary" variant="bordered">
+                  <Tab
+                    key="a props"
+                    title={
+                      <div className="flex items-center space-x-2">
+                        <span>A Propos</span>
+                      </div>
+                    }
+                  >
+                    <div className="bg-white shadow-md rounded-lg overflow-hidden">
+                      {/* Move image outside padding container for full width */}
+                      <HeroImage
+                        src={`http://127.0.0.1:8000${event.image}`}
+                        className="w-full h-64 md:h-80 lg:h-96 object-cover"
+                      />
+
+                      {/* Content with padding */}
+                      <div className="p-6">
+                        <section id="about" className="mb-8">
+                          <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+                            {event.title}
+                          </h2>
+                          <div className="flex items-center gap-4 mb-4">
+                            <span className="text-gray-600">
+                              📅 {formatDate(event.start_date)}
+                              {formatDate(event.end_date)}
+                            </span>
+                            <span className="text-gray-600">
+                              📍 {event.location}
+                            </span>
+                          </div>
+
+                          {/* Rendered description */}
+                          <div className="mb-6">
+                            {renderDescription(event.description)}
+                          </div>
+
+                          {/* Updated button section - handles all cases */}
+                          {user?.role === "recruiter" ? (
+                            <>
+                              <Button
+                                onPress={onOpen}
+                                color="danger"
+                                variant="flat"
+                              >
+                                Annuler l'événement
+                              </Button>
+                              <Modal
+                                isOpen={isOpen}
+                                onOpenChange={onOpenChange}
+                              >
+                                <ModalContent>
+                                  {(onClose) => (
+                                    <>
+                                      <ModalHeader className="flex flex-col gap-1">
+                                        Confirmer l'annulation
+                                      </ModalHeader>
+                                      <ModalBody>
+                                        <p>
+                                          Êtes-vous sûr de vouloir annuler cet
+                                          événement ? Cette action est
+                                          irréversible.
+                                        </p>
+                                      </ModalBody>
+                                      <ModalFooter>
+                                        <Button
+                                          color="danger"
+                                          variant="light"
+                                          onPress={onClose}
+                                        >
+                                          Non
+                                        </Button>
+                                        <Button
+                                          color="primary"
+                                          onPress={AnnulerEvenement}
+                                          variant="flat"
+                                        >
+                                          Oui
+                                        </Button>
+                                      </ModalFooter>
+                                    </>
+                                  )}
+                                </ModalContent>
+                              </Modal>
+                            </>
+                          ) : (
+                            <Button
+                              className="mt-4"
+                              color="primary"
+                              variant="flat"
+                              isDisabled={isRegistered}
+                              onPress={() => {
+                                if (user?.role === "talent") {
+                                  onOpenCvModal();
+                                } else if (!isRegistered) {
+                                  onOpenRegistrationModal();
+                                }
+                              }}
+                            >
+                              {isRegistered ? "Déjà inscrit" : "S'inscrire"}
+                            </Button>
+                          )}
+                        </section>
+                      </div>
+                    </div>{" "}
+                  </Tab>
+                  <Tab
+                    key="Participants"
+                    title={
+                      <div className="flex items-center space-x-2">
+                        <Users width={20} height={20} />
+                        <span>Participants</span>
+                      </div>
+                    }
+                  >
+                    Liste des participants
+                  </Tab>
+                  <Tab
+                    key="videos"
+                    title={
+                      <div className="flex items-center space-x-2">
+                        <span>Statistiques</span>
+                      </div>
+                    }
+                  >
+                    Statistiques
+                  </Tab>
+                </Tabs>
+              ) : (
+                <div className="bg-white shadow-md rounded-lg overflow-hidden">
+                  {/* Move image outside padding container for full width */}
+                  <HeroImage
+                    src={`http://127.0.0.1:8000${event.image}`}
+                    className="w-full h-64 md:h-80 lg:h-96 object-cover"
+                  />
+
+                  {/* Content with padding */}
+                  <div className="p-6">
+                    <section id="about" className="mb-8">
+                      <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+                        {event.title}
+                      </h2>
+                      <div className="flex items-center gap-4 mb-4">
+                        <span className="text-gray-600">
+                          📅 {formatDate(event.start_date)}
+                          {formatDate(event.end_date)}
+                        </span>
+                        <span className="text-gray-600">
+                          📍 {event.location}
+                        </span>
+                      </div>
+
+                      {/* Rendered description */}
+                      <div className="mb-6">
+                        {renderDescription(event.description)}
+                      </div>
+
+                      {/* Updated button section - handles all cases */}
+                      {user?.role === "recruiter" ? (
+                        <>
+                          <Button
+                            onPress={onOpen}
+                            color="danger"
+                            variant="flat"
+                          >
+                            Annuler l'événement
+                          </Button>
+                          <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+                            <ModalContent>
+                              {(onClose) => (
+                                <>
+                                  <ModalHeader className="flex flex-col gap-1">
+                                    Confirmer l'annulation
+                                  </ModalHeader>
+                                  <ModalBody>
+                                    <p>
+                                      Êtes-vous sûr de vouloir annuler cet
+                                      événement ? Cette action est irréversible.
+                                    </p>
+                                  </ModalBody>
+                                  <ModalFooter>
+                                    <Button
+                                      color="danger"
+                                      variant="light"
+                                      onPress={onClose}
+                                    >
+                                      Non
+                                    </Button>
+                                    <Button
+                                      color="primary"
+                                      onPress={AnnulerEvenement}
+                                      variant="flat"
+                                    >
+                                      Oui
+                                    </Button>
+                                  </ModalFooter>
+                                </>
+                              )}
+                            </ModalContent>
+                          </Modal>
+                        </>
+                      ) : (
+                        <Button
+                          className="mt-4"
+                          color="primary"
+                          variant="flat"
+                          isDisabled={isRegistered}
+                          onPress={() => {
+                            if (user?.role === "talent") {
+                              onOpenCvModal();
+                            } else if (!isRegistered) {
+                              onOpenRegistrationModal();
+                            }
+                          }}
+                        >
+                          {isRegistered ? "Déjà inscrit" : "S'inscrire"}
+                        </Button>
+                      )}
+                    </section>
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Sidebar */}
-            <div className="lg:col-span-1">
-              <div className="bg-white shadow-md rounded-lg p-6">
+            {/* <div className="lg:col-span-1"> */}
+            {/* <div className="bg-white shadow-md rounded-lg p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
                   Navigation
                 </h2>
@@ -461,8 +714,8 @@ export default function EventDetailsPage() {
                     </li>
                   )}
                 </ul>
-              </div>
-              {/* QR Code Section */}
+              </div> */}
+            {/* QR Code Section
               {user && user.role === "recruiter" && (
                 <div className="bg-white shadow-md rounded-lg p-6 mt-6">
                   <div className="flex justify-between items-center mb-4">
@@ -482,89 +735,11 @@ export default function EventDetailsPage() {
                     <QRCode value={`${apiUrl}${event.id}/`} size={128} />
                   </div>
                 </div>
-              )}
-            </div>
+              )} */}
+            {/* </div> */}
 
             {/* Main Content */}
-            <div className="lg:col-span-2">
-              <div className="bg-white shadow-md rounded-lg p-6">
-                <section id="about" className="mb-8">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                    {event.title}
-                  </h2>
-                  <div className="flex items-center gap-4 mb-4">
-                    <span className="text-gray-600">
-                      📅 {formatDate(event.start_date)}
-                      {formatDate(event.end_date)}
-                    </span>
-                    <span className="text-gray-600">📍 {event.location}</span>
-                  </div>
-
-                  {/* Rendered description */}
-                  <div className="mb-6">
-                    {renderDescription(event.description)}
-                  </div>
-
-                  {/* Updated button section - handles all cases */}
-                  {user?.role === "recruiter" ? (
-                    <>
-                      <Button onPress={onOpen} color="danger" variant="flat">
-                        Annuler l'événement
-                      </Button>
-                      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-                        <ModalContent>
-                          {(onClose) => (
-                            <>
-                              <ModalHeader className="flex flex-col gap-1">
-                                Confirmer l'annulation
-                              </ModalHeader>
-                              <ModalBody>
-                                <p>
-                                  Êtes-vous sûr de vouloir annuler cet événement ?
-                                  Cette action est irréversible.
-                                </p>
-                              </ModalBody>
-                              <ModalFooter>
-                                <Button
-                                  color="danger"
-                                  variant="light"
-                                  onPress={onClose}
-                                >
-                                  Non
-                                </Button>
-                                <Button
-                                  color="primary"
-                                  onPress={AnnulerEvenement}
-                                  variant="flat"
-                                >
-                                  Oui
-                                </Button>
-                              </ModalFooter>
-                            </>
-                          )}
-                        </ModalContent>
-                      </Modal>
-                    </>
-                  ) : (
-                    <Button
-                      className="mt-4"
-                      color="primary"
-                      variant="flat"
-                      isDisabled={isRegistered}
-                      onPress={() => {
-                        if (user?.role === "talent") {
-                          onOpenCvModal();
-                        } else if (!isRegistered) {
-                          onOpenRegistrationModal();
-                        }
-                      }}
-                    >
-                      {isRegistered ? "Déjà inscrit" : "S'inscrire"}
-                    </Button>
-                  )}
-                </section>
-              </div>
-            </div>
+            <div className="lg:col-span-2"></div>
           </div>
         </div>
 
@@ -583,13 +758,13 @@ export default function EventDetailsPage() {
               <Button
                 color="primary"
                 variant="flat"
-                onPress={() => handleCvChoice('keep')}
+                onPress={() => handleCvChoice("keep")}
               >
                 Conserver le même CV
               </Button>
               <Button
                 color="secondary"
-                onPress={() => handleCvChoice('import')}
+                onPress={() => handleCvChoice("import")}
               >
                 Importer un autre CV
               </Button>
@@ -622,30 +797,13 @@ export default function EventDetailsPage() {
                 }}
                 className="space-y-4"
               >
-                <Input
-                  label="Prénom"
-                  name="first_name"
-                  required
-                />
+                <Input label="Prénom" name="first_name" required />
 
-                <Input
-                  label="Nom"
-                  name="last_name"
-                  required
-                />
+                <Input label="Nom" name="last_name" required />
 
-                <Input
-                  label="Email"
-                  name="email"
-                  type="email"
-                  required
-                />
+                <Input label="Email" name="email" type="email" required />
 
-                <Input
-                  label="Téléphone"
-                  name="phone"
-                  required
-                />
+                <Input label="Téléphone" name="phone" required />
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -674,9 +832,9 @@ export default function EventDetailsPage() {
             </ModalHeader>
             <ModalBody>
               <p className="text-gray-700">
-                Êtes-vous sûr de vouloir utiliser votre CV actuel ?
-                Cette action est définitive et vous ne pourrez pas modifier
-                votre CV pour cet événement par la suite.
+                Êtes-vous sûr de vouloir utiliser votre CV actuel ? Cette action
+                est définitive et vous ne pourrez pas modifier votre CV pour cet
+                événement par la suite.
               </p>
             </ModalBody>
             <ModalFooter>
@@ -687,10 +845,7 @@ export default function EventDetailsPage() {
               >
                 Annuler
               </Button>
-              <Button
-                color="primary"
-                onPress={confirmKeepCv}
-              >
+              <Button color="primary" onPress={confirmKeepCv}>
                 Confirmer
               </Button>
             </ModalFooter>

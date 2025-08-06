@@ -20,7 +20,7 @@ const MOCK_USER: User = {
   name: 'John Doe',
   email: 'john.doe@example.com',
   avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-  role: 'talent',
+  role: 'recruiter',
 };
 
 interface UserProviderProps {
