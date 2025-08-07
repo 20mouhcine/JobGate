@@ -24,21 +24,31 @@ import { useUser } from "@/contexts/UserContext";
 // Define proper types
 interface Event {
   id: string | number;
+  image?: File | null;
+  caption?: string;
   title: string;
   date: string;
-  location: string;
+  location: string | null;
   description: string;
   is_timeSlot_enabled: boolean;
+  is_online?: boolean;
+  recruiters_number?: number;
+  meeting_link?: string | null;
 }
 
 interface FormData {
   title: string;
+  image?: File | null;
+  caption?: string;
   start_date: CalendarDate | null;
   end_date: CalendarDate | null;
-  location: string;
+  location: string | null;
   description: string;
   is_timeSlot_enabled: boolean;
   recruiterId: number | null;
+  recruiters_number?: number;
+  is_online?: boolean;
+  meeting_link?: string | null;
 }
 
 interface TimeSlotFormData {
@@ -53,21 +63,34 @@ export default function EventsPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const steps = ["Basic info", "description", "Time slots"];
-  const {user} = useUser()
+  const { user } = useUser();
   const [formData, setFormData] = useState<FormData>({
     title: "",
+    image: null,
+    caption: "",
     start_date: null,
     end_date: null,
     location: "",
     description: "",
     is_timeSlot_enabled: false,
     recruiterId: user?.id || null,
+    recruiters_number: 1,
+    is_online: false,
+    meeting_link: null,
   });
   const [timeSlotData, setTimeSlotData] = useState<TimeSlotFormData>({
     startTime: "",
     endTime: "",
     slot: 10,
   });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setFormData((prev) => ({
+      ...prev,
+      image: file || null,
+    }));
+  };
 
   const apiUrl =
     import.meta.env.VITE_API_URL || "http://localhost:8000/api/events/";
@@ -79,9 +102,9 @@ export default function EventsPage() {
   // Update recruiterId when user changes
   useEffect(() => {
     if (user?.id) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        recruiterId: user.id
+        recruiterId: user.id,
       }));
     }
   }, [user]);
@@ -182,16 +205,42 @@ export default function EventsPage() {
     handleTimeSlotChange("slot", value);
   };
 
-  // Enhanced form validation
+  // Handle online event switch change
+  const handleOnlineEventChange = (isSelected: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      is_online: isSelected,
+      // Clear location if online, clear meeting link if not online
+      location: isSelected ? null : prev.location,
+      meeting_link: isSelected ? prev.meeting_link : null,
+    }));
+  };
+
+  // Handle recruiters number change
+  const handleRecruitersNumberChange = (value: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      recruiters_number: value,
+    }));
+  };
+
+  // Enhanced form validation - FIXED
   const isStepValid = (step: number) => {
     switch (step) {
       case 0:
         return (
           formData.title.trim() !== "" &&
-          formData.location.trim() !== "" &&
+          formData.image !== null &&
+          formData.caption?.trim() !== "" &&
           formData.start_date !== null &&
           formData.end_date !== null &&
-          formData.recruiterId !== null
+          formData.recruiterId !== null &&
+          formData.is_online !== undefined &&
+          formData.recruiters_number !== undefined &&
+          // Location validation: required if NOT online
+          (!formData.is_online ? formData.location?.trim() !== "" : true) &&
+          // Meeting link validation: required if online
+          (formData.is_online ? formData.meeting_link?.trim() !== "" : true)
         );
       case 1:
         return formData.description.trim() !== "";
@@ -207,13 +256,22 @@ export default function EventsPage() {
     }
   };
 
+  // Updated form validation - FIXED
   const isFormValid = () => {
     const basicFieldsValid =
       formData.title.trim() !== "" &&
-      formData.location.trim() !== "" &&
+      formData.image !== null &&
+      formData.caption?.trim() !== "" &&
       formData.start_date !== null &&
       formData.end_date !== null &&
-      formData.recruiterId !== null;
+      formData.recruiterId !== null &&
+      formData.is_online !== undefined &&
+      formData.recruiters_number !== undefined &&
+      formData.description.trim() !== "" &&
+      // Location validation: required if NOT online
+      (!formData.is_online ? formData.location?.trim() !== "" : true) &&
+      // Meeting link validation: required if online
+      (formData.is_online ? formData.meeting_link?.trim() !== "" : true);
 
     // If time slots are enabled, validate time slot fields
     if (formData.is_timeSlot_enabled) {
@@ -227,7 +285,21 @@ export default function EventsPage() {
     return basicFieldsValid;
   };
 
-  // Submit handler with API call
+  // Handle next step navigation
+  const handleNextStep = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent any form submission
+    e.stopPropagation(); // Stop event bubbling
+    setCurrentStep(currentStep + 1);
+  };
+
+  // Handle previous step navigation
+  const handlePreviousStep = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent any form submission
+    e.stopPropagation(); // Stop event bubbling
+    setCurrentStep(currentStep - 1);
+  };
+
+  // Submit handler with API call - FIXED
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -248,27 +320,55 @@ export default function EventsPage() {
         ? `${formData.end_date.year}-${String(formData.end_date.month).padStart(2, "0")}-${String(formData.end_date.day).padStart(2, "0")}`
         : null;
 
-      // Step 1: Create the event
-      const eventPayload = {
-        title: formData.title,
-        location: formData.location,
-        description: formData.description,
-        start_date: start_dateString,
-        end_date: end_dateString,
-        is_timeSlot_enabled: formData.is_timeSlot_enabled,
-        recruiterId: formData.recruiterId, // Add recruiterId to the payload
-      };
+      // Create FormData for file upload
+      const formDataToSend = new FormData();
+      formDataToSend.append("title", formData.title);
+      formDataToSend.append("caption", formData.caption || "");
+      
+      // Handle location - only append if not online or has value
+      if (!formData.is_online && formData.location) {
+        formDataToSend.append("location", formData.location);
+      } else if (formData.is_online) {
+        // For online events, you might want to set location to null or empty
+        formDataToSend.append("location", "");
+      }
+      
+      formDataToSend.append("description", formData.description);
+      formDataToSend.append("start_date", start_dateString || "");
+      formDataToSend.append("end_date", end_dateString || "");
+      formDataToSend.append(
+        "is_timeSlot_enabled",
+        String(formData.is_timeSlot_enabled)
+      );
+      formDataToSend.append("recruiterId", String(formData.recruiterId));
+      formDataToSend.append(
+        "recruiters_number",
+        String(formData.recruiters_number || 1)
+      );
+      formDataToSend.append("is_online", String(formData.is_online || false));
+      
+      // Handle meeting link - only append if online and has value
+      if (formData.is_online && formData.meeting_link) {
+        formDataToSend.append("meeting_link", formData.meeting_link);
+      } else {
+        formDataToSend.append("meeting_link", "");
+      }
 
+      if (formData.image) {
+        formDataToSend.append("image", formData.image);
+      }
+
+      // FIXED: Remove Content-Type header for FormData
       const eventResponse = await fetch(apiUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(eventPayload),
+        // Don't set Content-Type header - let browser set it with boundary
+        body: formDataToSend,
       });
 
       if (!eventResponse.ok) {
-        throw new Error(`HTTP error! status: ${eventResponse.status}`);
+        const errorData = await eventResponse.text();
+        console.error("Server error:", errorData);
+        throw new Error(`HTTP error! status: ${eventResponse.status} - ${errorData}`);
       }
 
       const newEvent = await eventResponse.json();
@@ -290,8 +390,6 @@ export default function EventsPage() {
         });
 
         if (!timeSlotResponse.ok) {
-          // If time slot creation fails, we should probably delete the event
-          // or at least warn the user
           console.error("Failed to create time slots, but event was created");
           setError(
             "Event created successfully, but failed to create time slots. You can add them later."
@@ -305,12 +403,17 @@ export default function EventsPage() {
       // Reset forms
       setFormData({
         title: "",
+        image: null,
+        caption: "",
         start_date: null,
         end_date: null,
         location: "",
         description: "",
         is_timeSlot_enabled: false,
         recruiterId: user?.id || null,
+        recruiters_number: 1,
+        is_online: false,
+        meeting_link: null,
       });
       setTimeSlotData({
         startTime: "",
@@ -318,11 +421,14 @@ export default function EventsPage() {
         slot: 10,
       });
 
+      // Reset step
+      setCurrentStep(0);
+
       // Close modal
       onOpenChange();
     } catch (error) {
       console.error("Error creating event:", error);
-      setError("Failed to create event. Please try again.");
+      setError(`Failed to create event: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -331,15 +437,21 @@ export default function EventsPage() {
   // Reset error when modal closes
   const handleModalClose = () => {
     setError(null);
+    setCurrentStep(0); // Reset step when modal closes
     // Reset forms when modal closes
     setFormData({
       title: "",
+      image: null,
+      caption: "",
       start_date: null,
       end_date: null,
       location: "",
       description: "",
       is_timeSlot_enabled: false,
       recruiterId: user?.id || null,
+      recruiters_number: 1,
+      is_online: false,
+      meeting_link: null,
     });
     setTimeSlotData({
       startTime: "",
@@ -394,22 +506,80 @@ export default function EventsPage() {
           )}
 
           {/* Modal */}
-          <Modal isOpen={isOpen} onOpenChange={handleModalClose}>
+          <Modal isOpen={isOpen} onOpenChange={handleModalClose} size="2xl">
             <ModalContent className="max-h-[90vh] overflow-hidden flex flex-col">
               {() => (
                 <>
-                  <ModalHeader className="flex flex-col gap-1">
-                    Créer un événement
-                    <span className="text-default-500 text-sm">
-                      Remplissez les informations de l'événement
-                    </span>
+                  <ModalHeader className="flex flex-col gap-4 pb-4">
+                    <div className="flex flex-col gap-1">
+                      <h2 className="text-lg font-semibold">Create Event</h2>
+                      <span className="text-default-500 text-sm">
+                        Step {currentStep + 1} of {steps.length}: {steps[currentStep]}
+                      </span>
+                    </div>
+                    
+                    {/* Step Progress Slider */}
+                    <div className="w-full">
+                      <div className="flex justify-between items-center mb-2">
+                        {steps.map((step, index) => (
+                          <div
+                            key={step}
+                            className={`flex items-center ${
+                              index < steps.length - 1 ? 'flex-1' : ''
+                            }`}
+                          >
+                            <div className="flex flex-col items-center">
+                              <div
+                                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${
+                                  index < currentStep
+                                    ? 'bg-success text-white' // Completed steps
+                                    : index === currentStep
+                                    ? 'bg-primary text-white' // Current step
+                                    : 'bg-default-200 text-default-500' // Future steps
+                                }`}
+                              >
+                                {index < currentStep ? (
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                ) : (
+                                  index + 1
+                                )}
+                              </div>
+                              <span className={`text-xs mt-1 text-center max-w-20 ${
+                                index === currentStep 
+                                  ? 'text-primary font-medium' 
+                                  : 'text-default-500'
+                              }`}>
+                                {step}
+                              </span>
+                            </div>
+                            {index < steps.length - 1 && (
+                              <div className="flex-1 mx-2">
+                                <div className={`h-0.5 transition-all duration-200 ${
+                                  index < currentStep 
+                                    ? 'bg-success' 
+                                    : 'bg-default-200'
+                                }`} />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* Progress Bar */}
+                      <div className="w-full bg-default-200 rounded-full h-1">
+                        <div
+                          className="bg-primary h-1 rounded-full transition-all duration-300 ease-out"
+                          style={{
+                            width: `${((currentStep) / (steps.length - 1)) * 100}%`
+                          }}
+                        />
+                      </div>
+                    </div>
                   </ModalHeader>
                   <ModalBody className="overflow-y-auto px-4 flex-1">
-                    <form
-                      className="flex flex-col gap-4"
-                      onSubmit={handleSubmit}
-                      id="event-form"
-                    >
+                    <div className="flex flex-col gap-4">
                       {currentStep === 0 && (
                         <>
                           <Input
@@ -421,41 +591,106 @@ export default function EventsPage() {
                             onChange={handleChange}
                             isDisabled={isLoading}
                           />
-                          <DatePicker
-                            label="Start Date"
-                            value={formData.start_date}
-                            onChange={handleStartDateChange}
-                            isDisabled={isLoading}
-                            isRequired
-                          />
-                          <DatePicker
-                            label="End Date"
-                            value={formData.end_date}
-                            onChange={handleEndDateChange}
-                            isDisabled={isLoading}
-                            isRequired
-                          />
+
+                          <div className="flex flex-col gap-2">
+                            <Input
+                              label="Event Image"
+                              type="file"
+                              name="image"
+                              accept="image/*"
+                              onChange={handleFileChange}
+                              isDisabled={isLoading}
+                              description="Select an image file for the event banner"
+                              isRequired
+                            />
+                            {formData.image && (
+                              <div className="text-sm text-gray-600">
+                                Selected: {formData.image.name}
+                              </div>
+                            )}
+                          </div>
+
                           <Input
-                            label="Location"
-                            name="location"
-                            placeholder="Enter event location"
+                            label="Event Caption"
+                            name="caption"
+                            placeholder="Enter Event caption"
                             required
-                            value={formData.location}
+                            value={formData.caption || ""}
                             onChange={handleChange}
                             isDisabled={isLoading}
+                            description="Brief description of the event"
                           />
-                          {/* Display current recruiter (optional) */}
-                          {user && (
-                            <div className="text-sm text-gray-600">
-                              Recruiter: {user.name || user.email || `ID: ${user.id}`}
+
+                          <div className="flex gap-4">
+                            <DatePicker
+                              label="Start Date"
+                              value={formData.start_date}
+                              onChange={handleStartDateChange}
+                              isDisabled={isLoading}
+                              isRequired
+                            />
+                            <DatePicker
+                              label="End Date"
+                              value={formData.end_date}
+                              onChange={handleEndDateChange}
+                              isDisabled={isLoading}
+                              isRequired
+                            />
+                          </div>
+
+                          <div className="flex flex-row gap-4">
+                            <NumberInput
+                              label="Number of Recruiters"
+                              className="flex-1"
+                              placeholder="1"
+                              value={formData.recruiters_number || 1}
+                              onValueChange={handleRecruitersNumberChange}
+                              isDisabled={isLoading}
+                              min={1}
+                              max={20}
+                              step={1}
+                              description="Number of recruiters for this event"
+                              isRequired
+                            />
+                            <div className="flex items-center -mt-6">
+                              <Switch
+                                isSelected={formData.is_online || false}
+                                onValueChange={handleOnlineEventChange}
+                                isDisabled={isLoading}
+                              >
+                                Online Event
+                              </Switch>
                             </div>
+                          </div>
+
+                          {formData.is_online ? (
+                            <Input
+                              label="Meeting Link"
+                              name="meeting_link"
+                              placeholder="Enter meeting link (Zoom, Teams, etc.)"
+                              required
+                              value={formData.meeting_link || ""}
+                              onChange={handleChange}
+                              isDisabled={isLoading}
+                            />
+                          ) : (
+                            <Input
+                              label="Location"
+                              name="location"
+                              placeholder="Enter event location"
+                              required
+                              value={formData.location || ""}
+                              onChange={handleChange}
+                              isDisabled={isLoading}
+                            />
                           )}
                         </>
                       )}
+
                       {currentStep === 1 && (
                         <div>
                           <label className="block text-sm font-medium mb-1">
-                            Description
+                            Description *
                           </label>
                           <ReactQuill
                             value={formData.description}
@@ -465,6 +700,7 @@ export default function EventsPage() {
                                 description: value,
                               }))
                             }
+                            className="h-screen"
                             modules={{
                               toolbar: {
                                 container: [
@@ -495,6 +731,7 @@ export default function EventsPage() {
                           />
                         </div>
                       )}
+
                       {currentStep === 2 && (
                         <>
                           <div className="flex items-center gap-2">
@@ -503,35 +740,34 @@ export default function EventsPage() {
                               onValueChange={handleSwitchChange}
                               isDisabled={isLoading}
                             >
-                              Activer Rdv
+                              Enable Appointments
                             </Switch>
                           </div>
 
-                          {/* Time Slot Configuration */}
                           {formData.is_timeSlot_enabled && (
                             <div className="border-t pt-4 mt-2">
                               <h4 className="text-sm font-medium text-gray-700 mb-3">
-                                Configuration des créneaux horaires
+                                Time Slot Configuration
                               </h4>
                               <div className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <TimeInput
-                                    label="Heure de début"
+                                    label="Start Time"
                                     onChange={handleStartTimeChange}
                                     isDisabled={isLoading}
                                     isRequired
-                                    description="Heure de début des rendez-vous"
+                                    description="Appointment start time"
                                   />
                                   <TimeInput
-                                    label="Heure de fin"
+                                    label="End Time"
                                     onChange={handleEndTimeChange}
                                     isDisabled={isLoading}
                                     isRequired
-                                    description="Heure de fin des rendez-vous"
+                                    description="Appointment end time"
                                   />
                                 </div>
                                 <NumberInput
-                                  label="Durée du créneau (minutes)"
+                                  label="Slot Duration (minutes)"
                                   placeholder="10"
                                   value={timeSlotData.slot}
                                   onValueChange={handleSlotChange}
@@ -539,39 +775,41 @@ export default function EventsPage() {
                                   min={5}
                                   max={120}
                                   step={5}
-                                  description="Durée de chaque créneau en minutes"
+                                  description="Duration of each time slot in minutes"
                                 />
                               </div>
                             </div>
                           )}
                         </>
                       )}
-                    </form>
+                    </div>
                   </ModalBody>
                   <ModalFooter className="sticky bottom-0 bg-white z-10">
+                   
                     {currentStep > 0 && (
-                      <Button onClick={() => setCurrentStep(currentStep - 1)}>
-                        Précédent
+                      <Button onClick={handlePreviousStep} type="button">
+                        Previous
                       </Button>
                     )}
                     {currentStep < steps.length - 1 ? (
                       <Button
-                        onClick={() => setCurrentStep(currentStep + 1)}
+                        onClick={handleNextStep}
                         isDisabled={!isStepValid(currentStep)}
                         color="primary"
                         variant="flat"
+                        type="button"
                       >
-                        Suivant
+                        Next
                       </Button>
                     ) : (
                       <Button
-                        type="submit"
-                        form="event-form"
+                        onClick={handleSubmit}
                         isDisabled={!isFormValid()}
                         isLoading={isLoading}
                         color="primary"
+                        type="button"
                       >
-                        {isLoading ? "Création..." : "Créer l'événement"}
+                        {isLoading ? "Creating..." : "Create Event"}
                       </Button>
                     )}
                   </ModalFooter>
