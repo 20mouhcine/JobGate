@@ -62,6 +62,7 @@ export default function EventsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
   const steps = ["Basic info", "description", "Time slots"];
   const { user } = useUser();
   const [formData, setFormData] = useState<FormData>({
@@ -324,7 +325,7 @@ export default function EventsPage() {
       const formDataToSend = new FormData();
       formDataToSend.append("title", formData.title);
       formDataToSend.append("caption", formData.caption || "");
-      
+
       // Handle location - only append if not online or has value
       if (!formData.is_online && formData.location) {
         formDataToSend.append("location", formData.location);
@@ -332,7 +333,7 @@ export default function EventsPage() {
         // For online events, you might want to set location to null or empty
         formDataToSend.append("location", "");
       }
-      
+
       formDataToSend.append("description", formData.description);
       formDataToSend.append("start_date", start_dateString || "");
       formDataToSend.append("end_date", end_dateString || "");
@@ -346,7 +347,7 @@ export default function EventsPage() {
         String(formData.recruiters_number || 1)
       );
       formDataToSend.append("is_online", String(formData.is_online || false));
-      
+
       // Handle meeting link - only append if online and has value
       if (formData.is_online && formData.meeting_link) {
         formDataToSend.append("meeting_link", formData.meeting_link);
@@ -469,8 +470,10 @@ export default function EventsPage() {
             <Input
               className="w-auto max-w-xs"
               placeholder="Search events..."
-              // You can add search functionality here
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
+
             <Button onPress={onOpen} color="primary">
               Create Event
             </Button>
@@ -490,19 +493,27 @@ export default function EventsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
-              {events.length > 0 ? (
-                events.map((event) => (
-                  <EventCard
-                    key={event.id || `event-${Math.random()}`}
-                    event={event}
-                  />
-                ))
-              ) : (
-                <div className="col-span-full text-center py-8 text-gray-500">
-                  No events found. Create your first event!
-                </div>
-              )}
+              {events
+                .filter((event) =>
+                  event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  event.description.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+
+              {events.filter((event) =>
+                event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                event.description.toLowerCase().includes(searchTerm.toLowerCase())
+              ).length === 0 && (
+                  <div className="col-span-full text-center py-8 text-gray-500">
+                    No events match your search.
+                  </div>
+                )}
             </div>
+
           )}
 
           {/* Modal */}
@@ -517,26 +528,24 @@ export default function EventsPage() {
                         Step {currentStep + 1} of {steps.length}: {steps[currentStep]}
                       </span>
                     </div>
-                    
+
                     {/* Step Progress Slider */}
                     <div className="w-full">
                       <div className="flex justify-between items-center mb-2">
                         {steps.map((step, index) => (
                           <div
                             key={step}
-                            className={`flex items-center ${
-                              index < steps.length - 1 ? 'flex-1' : ''
-                            }`}
+                            className={`flex items-center ${index < steps.length - 1 ? 'flex-1' : ''
+                              }`}
                           >
                             <div className="flex flex-col items-center">
                               <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${
-                                  index < currentStep
-                                    ? 'bg-success text-white' // Completed steps
-                                    : index === currentStep
+                                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${index < currentStep
+                                  ? 'bg-success text-white' // Completed steps
+                                  : index === currentStep
                                     ? 'bg-primary text-white' // Current step
                                     : 'bg-default-200 text-default-500' // Future steps
-                                }`}
+                                  }`}
                               >
                                 {index < currentStep ? (
                                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -546,27 +555,25 @@ export default function EventsPage() {
                                   index + 1
                                 )}
                               </div>
-                              <span className={`text-xs mt-1 text-center max-w-20 ${
-                                index === currentStep 
-                                  ? 'text-primary font-medium' 
-                                  : 'text-default-500'
-                              }`}>
+                              <span className={`text-xs mt-1 text-center max-w-20 ${index === currentStep
+                                ? 'text-primary font-medium'
+                                : 'text-default-500'
+                                }`}>
                                 {step}
                               </span>
                             </div>
                             {index < steps.length - 1 && (
                               <div className="flex-1 mx-2">
-                                <div className={`h-0.5 transition-all duration-200 ${
-                                  index < currentStep 
-                                    ? 'bg-success' 
-                                    : 'bg-default-200'
-                                }`} />
+                                <div className={`h-0.5 transition-all duration-200 ${index < currentStep
+                                  ? 'bg-success'
+                                  : 'bg-default-200'
+                                  }`} />
                               </div>
                             )}
                           </div>
                         ))}
                       </div>
-                      
+
                       {/* Progress Bar */}
                       <div className="w-full bg-default-200 rounded-full h-1">
                         <div
@@ -785,7 +792,7 @@ export default function EventsPage() {
                     </div>
                   </ModalBody>
                   <ModalFooter className="sticky bottom-0 bg-white z-10">
-                   
+
                     {currentStep > 0 && (
                       <Button onClick={handlePreviousStep} type="button">
                         Previous
