@@ -6,6 +6,9 @@ export interface User {
   email: string;
   avatar?: string;
   role?: string;
+  hasAccount?:boolean;
+  etablissement?: String;
+  filiere?: String;
 }
 
 export interface UserContextType {
@@ -16,12 +19,17 @@ export interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const MOCK_USER: User = {
-  id: 1,
+  id: 2,
   name: 'John Doe',
   email: 'john.doe@example.com',
   avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
   role: 'recruiter',
+  hasAccount: true,
+  etablissement:"EMSI",
+  filiere:"Ingenierie informatique et réseaux",
 };
+
+
 
 interface UserProviderProps {
   children: ReactNode;

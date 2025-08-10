@@ -10,17 +10,17 @@ class EventSerializer(serializers.ModelSerializer):
 class TalentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Talent
-        fields = ['id', 'name', 'email', 'phone', 'resume']
+        fields = ['id', 'name', 'email', 'phone', 'etablissement','filiere','resume']
         read_only_fields = ['id']  
        
 
 class ParticipationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Participation
-        fields = ['id', 'talent', 'event', 'is_attending', 'date_inscription', 'note', 'comment', 'is_selected', 'rdv','event_time_slot']
+        fields = ['id', 'talent_id', 'event_id', 'has_attended', 'date_inscription', 'note', 'comment', 'is_selected', 'rdv','event_time_slot']
         read_only_fields = ['id', 'date_inscription']
         depth = 1
-    
+
     def to_internal_value(self, data):
         internal_data = data.copy()
         

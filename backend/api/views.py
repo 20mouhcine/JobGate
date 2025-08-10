@@ -4,6 +4,9 @@ from .serializers import EventSerializer, TalentSerializer, ParticipationSeriali
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.files.storage import default_storage
+from datetime import timedelta, datetime
+
+
 
 # Create your views here.
 
@@ -107,6 +110,20 @@ class TalentDetailView(APIView):
         serializer = TalentSerializer(talent)
         return Response(serializer.data)
     
+    def put(self, request, pk):
+        """
+        Update a talent instance.
+        """
+        try:
+            talent = self.get_object(pk)
+        except Talent.DoesNotExist:
+            return Response(status=404) 
+        serializer = TalentSerializer(talent, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+    
 class ParticipationView(APIView):
     
     def get(self, request):
@@ -117,28 +134,81 @@ class ParticipationView(APIView):
         serializer = ParticipationSerializer(participations, many=True)
         return Response(serializer.data)
     
+
     def post(self, request):
-        """
-        Create a new participation.
-        """
+        # Create Talent
+        talent_id = request.data.get('talent_id')
+        event_id = request.data.get('event_id')
 
-        serializer = ParticipationSerializer(data=request.data)
-        if serializer.is_valid():
-            rdv = serializer.validated_data.get('rdv')
-            if not serializer.validated_data.get('event_time_slot').start_time <rdv < serializer.validated_data.get('event_time_slot').end_time:
-                return Response({'rdv': ['The rdv time must be within the event time slot.']}, status=400)
-            
-            event = serializer.validated_data.get('event')
-            if rdv and event:
-                time_slot = TimeSlot.objects.filter(event=event,rdv=rdv).first()
-                if not time_slot:
-                    return Response({'rdv': ['This time slot is already taken by another participant.']}, status=400)
-        
-            serializer.save()
-            return Response(serializer.data, status=201)
-        return Response(serializer.errors, status=400)
+        if talent_id:
+            try:
+                talent= Talent.objects.get(id=talent_id)
+                participation = Participation.objects.create(
+                    talent_id=talent,
+                    event_id=Event.objects.get(id=event_id)
+                )
+
+            except Talent.DoesNotExist:
+                return Response({'error': 'Talent not found'}, status=404)
+
+        talent_serializer = TalentSerializer(data=request.data)
+        if talent_serializer.is_valid():
+            talent = talent_serializer.save()
+
+            event = Event.objects.get(id=event_id)
+
+            if event.is_timeSlot_enabled:
+                available_slot = (
+                    TimeSlot.objects
+                    .filter(event=event)
+                    .exclude(participation__isnull=False)
+                    .order_by('start_time')
+                    .first()
+                )
+
+                if not available_slot:
+                    return Response({'error': 'No available time slots'}, status=400)
+
+            # Create participation
+                participation = Participation.objects.create(
+                    talent_id=talent,
+                    event_id=event,
+                    rdv=available_slot.start_time,
+                    event_time_slot=available_slot
+                )
+
+                return Response({
+                    'talent': TalentSerializer(talent).data,
+                    'participation': ParticipationSerializer(participation).data
+                }, status=201)
+            else:
+                participation = Participation.objects.create(
+                    talent_id=talent,
+                    event_id=event
+                )
+                return Response({
+                    'talent': TalentSerializer(talent).data,
+                    'participation': ParticipationSerializer(participation).data
+                }, status=201)
+
+        return Response(talent_serializer.errors, status=400)
+
+
     
+def generate_rdv_slots(start_time, end_time, recruiters_count, rdv_duration_minutes=15):
+    slots = []
+    current_time = start_time
 
+    while current_time < end_time:
+        for recruiter in range(recruiters_count):
+            slots.append({
+                "start": current_time,
+                "end": current_time + timedelta(minutes=rdv_duration_minutes),
+                "recruiter": recruiter + 1  # recruiter ID or index
+            })
+        current_time += timedelta(minutes=rdv_duration_minutes)
+
+    return slots
     
 class ParticipationDetailView(APIView):
     def get(self, request):
@@ -149,24 +219,27 @@ class ParticipationDetailView(APIView):
         event_id = request.query_params.get('event_id')
         talent_id = request.query_params.get('talent_id')
 
-        
         if not event_id and not talent_id:
-                return Response({'detail': 'please add at least one param'}, status=400) 
-        
+            return Response({'detail': 'please add at least one param'}, status=400)
+
+        participation = None
         try:
-            if not event_id:
-                participation = Participation.objects.get(talent_id=talent_id)
-            elif not talent_id:
-                participation = Participation.objects.get(event_id=event_id)   
-            
-            else:
+            if event_id and talent_id:
                 participation = Participation.objects.filter(event_id=event_id, talent_id=talent_id).first()
-        except Participation.DoesNotExist:
-            return Response({'detail': 'Participation not found.'}, status=404)
+            
+            elif talent_id:
+                participation = Participation.objects.filter(talent_id=talent_id).first()
+
+            if not participation:
+                return Response({'detail': 'Participation not found.'})
+
+        except Exception as e:
+            return Response({'detail': str(e)}, status=400)
+
         serializer = ParticipationSerializer(participation)
-
-
         return Response(serializer.data)
+    
+
     
     def put(self,request):
 
@@ -187,17 +260,29 @@ class ParticipationDetailView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
     
+
     def delete(self, request):
         event_id = request.query_params.get('event_id')
         talent_id = request.query_params.get('talent_id')
-        if not event_id and not talent_id:
+        if not event_id or not talent_id:
             return Response({'detail': 'Both event_id and talent_id are required'}, status=400)
-        try:
-            participation = Participation.objects.filter(event_id=event_id, talent_id=talent_id).first()
-            participation.delete()
-            return Response(status=204)
-        except Participation.DoesNotExist:
-            return Response({'detail': 'Participation not found.'}, status=404)     
+        participation = Participation.objects.filter(event_id=event_id, talent_id=talent_id).first()
+        participation_to_delete = Participation.objects.get(id=participation.id)
+        if not participation_to_delete:
+            return Response({'detail': 'Participation not found.'}, status=404)
+        participation_to_delete.delete()
+        return Response(status=204)
+ 
+
+class ParticipationsEventView(APIView):
+
+    def get(self, request, pk):
+        """
+        Retrieve all participations for a specific event.
+        """
+        participations = Participation.objects.filter(event_id=pk)
+        serializer = ParticipationSerializer(participations, many=True)
+        return Response(serializer.data)
     
 
 class TimeSlotView(APIView):
