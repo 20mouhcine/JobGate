@@ -12,7 +12,6 @@ export default function EventCard({ event }: { event?: any }) {
 
   const end_date = new Date(event?.end_date);
   const end_day = end_date.getDate();
-  console.log("event", event.image);
 
 
   return (

@@ -1,11 +1,12 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import DefaultLayout from "@/layouts/default";
-import { Users, Download } from "lucide-react";
+import { Users, Download, Badge } from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@heroui/button";
 import { useUser } from "@/contexts/UserContext";
 import { Tabs, Tab } from "@heroui/tabs";
+import { QrCode } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
 import {
   Modal,
@@ -17,16 +18,48 @@ import {
 } from "@heroui/modal";
 import { Input } from "@heroui/input";
 import { Image as HeroImage } from "@heroui/image";
+import { Card, CardBody } from "@heroui/card";
+import {
+  Table,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableHeader,
+} from "@heroui/table";
 
 interface Event {
   id: string | number;
   image?: string;
+  caption?: string;
   title: string;
   start_date: string;
   end_date: string;
   location: string;
   description: string;
   is_timeSlot_enabled: boolean;
+  is_online: boolean;
+}
+
+interface Talent {
+  id: number;
+  full_name: string;
+  email: string;
+  phone: string;
+  resume?: string;
+  etablissement?: string;
+  filiere?: string;
+}
+
+interface Participations {
+  id: number;
+  event_id: Event;
+  talent_id: Talent;
+  has_attended: boolean;
+  date_inscription: Date;
+  note: number;
+  comment: string;
+  rdv: string;
+  is_selected: boolean;
 }
 
 export default function EventDetailsPage() {
@@ -38,8 +71,25 @@ export default function EventDetailsPage() {
   const qrCodeRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
-  const navigate = useNavigate();
 
+  const [participations, setParticipations] = useState<Participations[]>([]);
+
+  const [showFileInput, setShowFileInput] = useState(false);
+  const [newCv, setNewCv] = useState<File | null>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setNewCv(e.target.files[0]);
+    }
+  };
+  const handleImportConfirm = () => {
+    if (!newCv) {
+      alert("Veuillez sélectionner un fichier CV avant d'importer.");
+      return;
+    }
+    handleCvChange();
+    setShowFileInput(false);
+  };
   const {
     isOpen: isCvModalOpen,
     onOpen: onOpenCvModal,
@@ -61,6 +111,7 @@ export default function EventDetailsPage() {
 
   const apiUrl =
     import.meta.env.VITE_API_URL || "http://localhost:8000/api/events/";
+  const apiParticipationsUrl = "http://localhost:8000/api/participations/";
 
   // CSS styles for proper list rendering
   const descriptionStyles = `
@@ -155,11 +206,26 @@ export default function EventDetailsPage() {
       margin: 1rem 0 !important;
     }
   `;
+
   useEffect(() => {
-    if (localStorage.getItem(`registered_${id}`)) {
-      setIsRegistered(true);
-    }
-  }, [id]);
+    const fetchParticipations = async () => {
+      if (!id) return;
+
+      const response = await fetch(`${apiParticipationsUrl}${id}/`, {
+        method: "GET",
+      });
+      if (response.status === 404) {
+        console.log("No participations found for this event.");
+      } else {
+        const data = await response.json();
+        setParticipations(data);
+        console.log("Participations fetched:", data);
+      }
+    };
+
+    fetchParticipations();
+  }, [id, user?.id]);
+
   useEffect(() => {
     const fetchEvent = async () => {
       if (!id) {
@@ -193,23 +259,69 @@ export default function EventDetailsPage() {
     fetchEvent();
   }, [id, apiUrl]);
 
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      const response = await fetch(
+        `http://localhost:8000/api/participations-details/?talent_id=${user?.id}&event_id=${event?.id}`
+      );
+      if (response.status == 404) {
+        setIsRegistered(false);
+      } else {
+        setIsRegistered(true);
+      }
+    };
+    if (user?.id && event?.id) checkRegistrationStatus();
+  }, [user?.id, event?.id]);
+
+  const handleCvChange = async () => {
+    if (!newCv) {
+      alert("Veuillez sélectionner un fichier CV avant d'importer.");
+      return;
+    }
+
+    try {
+      const cvData = new FormData();
+      cvData.append("resume", newCv);
+
+      const response = await fetch("http://localhost:8000/api/talents/1/", {
+        method: "PUT",
+        body: cvData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la mise à jour du CV");
+      }
+
+      alert("CV importé avec succès !");
+    } catch (error) {
+      console.error("Error updating CV:", error);
+      alert("Erreur lors de la mise à jour du CV");
+    }
+  };
+
   const handleCvChoice = (choice: "keep" | "import") => {
     onCloseCvModal();
     if (choice === "import") {
-      navigate("/profile");
+      handleCvChange();
     } else {
       onOpenConfirmModal();
     }
   };
   const confirmKeepCv = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/talents/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ event: id }),
-      });
+      const response = await fetch(
+        "http://localhost:8000/api/participations/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            talent_id: user?.id,
+            event_id: event?.id,
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Registration failed");
@@ -217,7 +329,6 @@ export default function EventDetailsPage() {
 
       onCloseConfirmModal();
       setIsRegistered(true);
-      localStorage.setItem(`registered_${id}`, "true");
       alert("Inscription réussie avec votre CV actuel !");
     } catch (error) {
       console.error("Registration error:", error);
@@ -227,17 +338,21 @@ export default function EventDetailsPage() {
   const handleRegistrationSubmit = async (formData: any) => {
     try {
       const form = new FormData();
-      form.append("first_name", formData.first_name);
-      form.append("last_name", formData.last_name);
+      form.append("full_name", formData.full_name);
       form.append("email", formData.email);
       form.append("phone", formData.phone);
       form.append("resume", formData.resume);
-      form.append("event", id!);
+      form.append("etablissement", formData.etablissement);
+      form.append("filiere", formData.filiere);
+      form.append("event_id", id!);
 
-      const response = await fetch("http://localhost:8000/api/talents/", {
-        method: "POST",
-        body: form,
-      });
+      const response = await fetch(
+        "http://localhost:8000/api/participations/",
+        {
+          method: "POST",
+          body: form,
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Registration failed");
@@ -245,8 +360,6 @@ export default function EventDetailsPage() {
 
       onCloseRegistrationModal();
       alert("Inscription réussie !");
-
-      localStorage.setItem(`registered_${id}`, "true");
     } catch (error) {
       console.error("Registration error:", error);
       alert("Erreur lors de l'inscription");
@@ -427,41 +540,50 @@ export default function EventDetailsPage() {
   return (
     <DefaultLayout>
       <div className="min-h-dvh -mt-2 bg-gray-100 py-6 w-full">
-        <div className="fixed left-0 top-1/2 -translate-y-1/2 z-50 ">
-          <Popover placement="left">
-            <PopoverTrigger className="bg-blue-600 p-2 rounded-full text-white hover:bg-blue-700 transition-colors font-bold">
-              <div className="flex flex-col items-center">
-
-              <span className="sr-only">QR Code</span>
-              
-                      
-                      <button
-                        onClick={downloadQRCode}
-                        color="primary"
-                        className="flex items-center  text-white rounded-md transition-colors"
-                      >
-                        <Download size={16} color="blue" />
-                      </button>
-              </div>
-            </PopoverTrigger>
-            <PopoverContent className="mt-2">
-              <div className="px-1 py-2">
-                <div className="text-small font-bold">Qr</div>
-                <div className="text-tiny">
-                    
-                    <div ref={qrCodeRef} className="flex flex-col items-center">
-                      <QRCode value={`${apiUrl}${event.id}/`} size={128} />
-                    </div>
-                  </div>
-                </div>
-            </PopoverContent>
-          </Popover>
-        </div>
         <div className="max-w-6xl mx-auto px-4">
           {/* Main Content Grid */}
           <div className="flex flex-col justify-center items-center gap-6">
             <div className="flex w-full flex-col justify-center items-center">
               {user && user.role === "recruiter" ? (
+                <>
+                <div className="fixed left-0 top-1/2 -translate-y-1/2 z-50 overflow-hidden">
+                                  <Popover placement="left">
+                                    <PopoverTrigger className="bg-blue-600 p-2 rounded-full text-white hover:bg-blue-700 transition-colors font-bold">
+                                      <div className="flex flex-col items-center">
+                                        <span className="sr-only">QR Code</span>
+                                        <QrCode
+                                          size={20}
+                                          className="font-bold"
+                                        />
+                                      </div>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="mt-2">
+                                      <div className="px-1 py-2  space-y-2">
+                                        <div className="text-small font-bold flex justify-between">
+                                          <span>Qr</span>
+                                          <button
+                                            onClick={downloadQRCode}
+                                            color="primary"
+                                            className="flex items-center  text-white rounded-md transition-colors"
+                                          >
+                                            <Download size={16} color="blue" />
+                                          </button>
+                                        </div>
+                                        <div className="text-tiny">
+                                          <div
+                                            ref={qrCodeRef}
+                                            className="flex flex-col items-center"
+                                          >
+                                            <QRCode
+                                              value={`${apiUrl}${event.id}/`}
+                                              size={128}
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
                 <Tabs aria-label="Options" color="primary" variant="bordered">
                   <Tab
                     key="a props"
@@ -471,102 +593,113 @@ export default function EventDetailsPage() {
                       </div>
                     }
                   >
-                    <div className="bg-white shadow-md rounded-lg overflow-hidden">
-                      {/* Move image outside padding container for full width */}
-                      <HeroImage
-                        src={`http://127.0.0.1:8000${event.image}`}
-                        className="w-full h-64 md:h-80 lg:h-96 object-cover"
-                      />
+                    <div className="bg-white shadow-md rounded-lg overflow-hidden p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                        {/* Left: Image */}
+                        <div>
+                          <HeroImage
+                            src={`http://127.0.0.1:8000${event.image}`}
+                            className="w-full h-64 object-cover rounded-md"
+                          />
+                        </div>
 
-                      {/* Content with padding */}
-                      <div className="p-6">
-                        <section id="about" className="mb-8">
-                          <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+                        {/* Center: Title and Description */}
+                        <div className="col-span-1">
+                          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
                             {event.title}
                           </h2>
-                          <div className="flex items-center gap-4 mb-4">
-                            <span className="text-gray-600">
-                              📅 {formatDate(event.start_date)}
-                              {formatDate(event.end_date)}
-                            </span>
-                            <span className="text-gray-600">
-                              📍 {event.location}
-                            </span>
-                          </div>
-
-                          {/* Rendered description */}
-                          <div className="mb-6">
+                          <p className="text-gray-600 italic mb-4">
+                            {event.caption}
+                          </p>
+                          <div className="text-gray-700 text-sm space-y-2">
                             {renderDescription(event.description)}
                           </div>
+                        </div>
 
-                          {/* Updated button section - handles all cases */}
-                          {user?.role === "recruiter" ? (
-                            <>
-                              <Button
-                                onPress={onOpen}
-                                color="danger"
-                                variant="flat"
-                              >
-                                Annuler l'événement
-                              </Button>
-                              <Modal
-                                isOpen={isOpen}
-                                onOpenChange={onOpenChange}
-                              >
-                                <ModalContent>
-                                  {(onClose) => (
-                                    <>
-                                      <ModalHeader className="flex flex-col gap-1">
-                                        Confirmer l'annulation
-                                      </ModalHeader>
-                                      <ModalBody>
-                                        <p>
+                        {/* Right: Details */}
+                        <div className="bg-gray-50 p-4 rounded-md shadow-sm text-sm text-gray-700 space-y-2">
+                          <p>
+                            <strong>📅 Date :</strong>{" "}
+                            {formatDate(event.start_date)} →{" "}
+                            {formatDate(event.end_date)}
+                          </p>
+                          {event.location === "" ? (
+                            <span> En ligne</span>
+
+                          ) : (
+                            <p>
+                              <strong>📍 Lieu :</strong> {event.location}
+                            </p>
+                          )}
+                          {/* Bottom Buttons */}
+                          <div className="mt-6">
+                            {user?.role === "recruiter" ? (
+                              <>
+                                
+                                <Button
+                                  onPress={onOpen}
+                                  color="danger"
+                                  variant="flat"
+                                >
+                                  Annuler l'événement
+                                </Button>
+                                <Modal
+                                  isOpen={isOpen}
+                                  onOpenChange={onOpenChange}
+                                >
+                                  <ModalContent>
+                                    {(onClose) => (
+                                      <>
+                                        <ModalHeader className="flex flex-col gap-1">
+                                          Confirmer l'annulation
+                                        </ModalHeader>
+                                        <ModalBody>
                                           Êtes-vous sûr de vouloir annuler cet
                                           événement ? Cette action est
                                           irréversible.
-                                        </p>
-                                      </ModalBody>
-                                      <ModalFooter>
-                                        <Button
-                                          color="danger"
-                                          variant="light"
-                                          onPress={onClose}
-                                        >
-                                          Non
-                                        </Button>
-                                        <Button
-                                          color="primary"
-                                          onPress={AnnulerEvenement}
-                                          variant="flat"
-                                        >
-                                          Oui
-                                        </Button>
-                                      </ModalFooter>
-                                    </>
-                                  )}
-                                </ModalContent>
-                              </Modal>
-                            </>
-                          ) : (
-                            <Button
-                              className="mt-4"
-                              color="primary"
-                              variant="flat"
-                              isDisabled={isRegistered}
-                              onPress={() => {
-                                if (user?.role === "talent") {
-                                  onOpenCvModal();
-                                } else if (!isRegistered) {
-                                  onOpenRegistrationModal();
-                                }
-                              }}
-                            >
-                              {isRegistered ? "Déjà inscrit" : "S'inscrire"}
-                            </Button>
-                          )}
-                        </section>
+                                        </ModalBody>
+                                        <ModalFooter>
+                                          <Button
+                                            color="danger"
+                                            variant="light"
+                                            onPress={onClose}
+                                          >
+                                            Non
+                                          </Button>
+                                          <Button
+                                            color="primary"
+                                            onPress={AnnulerEvenement}
+                                            variant="flat"
+                                          >
+                                            Oui
+                                          </Button>
+                                        </ModalFooter>
+                                      </>
+                                    )}
+                                  </ModalContent>
+                                </Modal>
+                              </>
+                            ) : (
+                              <Button
+                                className="mt-4"
+                                color="primary"
+                                variant="flat"
+                                isDisabled={isRegistered}
+                                onPress={() => {
+                                  if (user?.role === "talent") {
+                                    onOpenCvModal();
+                                  } else if (!isRegistered) {
+                                    onOpenRegistrationModal();
+                                  }
+                                }}
+                              >
+                                {isRegistered ? "Déjà inscrit" : "S'inscrire"}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>{" "}
+                    </div>
                   </Tab>
                   <Tab
                     key="Participants"
@@ -577,7 +710,155 @@ export default function EventDetailsPage() {
                       </div>
                     }
                   >
-                    Liste des participants
+                    <Card className="mt-6 shadow-md">
+                      <CardBody>
+                        <h2 className="text-xl font-semibold mb-4">
+                          Liste des participants
+                        </h2>
+
+
+{/* TODO: IMPLEMENT SEARCH FUNCTIONALITY */}
+
+                        {/* <div className="mb-4 flex justify-between items-center">
+                          <Input
+                            type="search"
+                            placeholder="Rechercher un participant..."
+                            className="max-w-xs"
+                            size="sm"
+                            startContent={<span className="text-gray-400">🔍</span>}
+                            onChange={(e) => {
+                              const searchValue = e.target.value.toLowerCase();
+                              setParticipations(participations.filter(p => 
+                                p.talent_id.full_name.toLowerCase().includes(searchValue) ||
+                                p.talent_id.email.toLowerCase().includes(searchValue) ||
+                                p.talent_id.phone.toLowerCase().includes(searchValue) ||
+                                (p.talent_id.etablissement && p.talent_id.etablissement.toLowerCase().includes(searchValue)) ||
+                                (p.talent_id.filiere && p.talent_id.filiere.toLowerCase().includes(searchValue))
+                              ));
+                            }}
+                          />
+                        </div> */}
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                  Nom
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                  Email
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                  Téléphone
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                  CV
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                  Etablissment
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                  Filière
+                                </th>
+                                {event.is_timeSlot_enabled && (
+
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                  RDV
+                                </th>
+                                )}
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                  Sélection
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {Array.isArray(participations) &&
+                              participations.length > 0 ? (
+                                participations.map((p) => (
+                                  <tr
+                                    key={p.id}
+                                    className="hover:bg-gray-50 transition-colors"
+                                  >
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                      {p.talent_id.full_name}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                      {p.talent_id.email}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                      {p.talent_id.phone}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                      {p.talent_id.resume ? (
+                                        <a
+                                          href={p.talent_id.resume}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-blue-600 underline hover:text-blue-800 transition-colors"
+                                        >
+                                          Voir CV
+                                        </a>
+                                      ) : (
+                                        <span className="text-gray-400 italic">
+                                          Aucun CV
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                      {p.talent_id.etablissement || "—"}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                      <span
+                                        className="max-w-xs truncate"
+                                        title={p.comment || "—"}
+                                      >
+                                        {p.talent_id.filiere || "—"}
+                                      </span>
+                                    </td>
+                                    {event.is_timeSlot_enabled && (
+                                      
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                      {p.rdv || "—"}
+                                    </td>
+                                      )}
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <span
+                                        className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
+                                          p.is_selected
+                                            ? "bg-green-100 text-green-800 border border-green-200"
+                                            : "bg-red-100 text-red-800 border border-red-200"
+                                        }`}
+                                      >
+                                        {p.is_selected
+                                          ? "✅ Sélectionné"
+                                          : "❌ Non sélectionné"}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))
+                              ) : (
+                                <tr>
+                                  <td
+                                    colSpan={8}
+                                    className="px-6 py-12 text-center"
+                                  >
+                                    <div className="flex flex-col items-center justify-center">
+                                      <div className="text-gray-400 text-4xl mb-2">
+                                        👥
+                                      </div>
+                                      <p className="text-gray-500 text-sm">
+                                        Aucun participant trouvé pour cet
+                                        événement
+                                      </p>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardBody>
+                    </Card>{" "}
                   </Tab>
                   <Tab
                     key="videos"
@@ -590,153 +871,112 @@ export default function EventDetailsPage() {
                     Statistiques
                   </Tab>
                 </Tabs>
-              ) : (
-                <div className="bg-white shadow-md rounded-lg overflow-hidden">
-                  {/* Move image outside padding container for full width */}
-                  <HeroImage
-                    src={`http://127.0.0.1:8000${event.image}`}
-                    className="w-full h-64 md:h-80 lg:h-96 object-cover"
-                  />
+                                </>
 
-                  {/* Content with padding */}
-                  <div className="p-6">
-                    <section id="about" className="mb-8">
-                      <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+              ) : (
+                <div className="bg-white shadow-md rounded-lg overflow-hidden p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                    {/* Left: Image */}
+                    <div>
+                      <HeroImage
+                        src={`http://127.0.0.1:8000${event.image}`}
+                        className="w-full h-64 object-cover rounded-md"
+                      />
+                    </div>
+
+                    {/* Center: Title and Description */}
+                    <div className="col-span-1">
+                      <h2 className="text-2xl font-semibold text-gray-900 mb-2">
                         {event.title}
                       </h2>
-                      <div className="flex items-center gap-4 mb-4">
-                        <span className="text-gray-600">
-                          📅 {formatDate(event.start_date)}
-                          {formatDate(event.end_date)}
-                        </span>
-                        <span className="text-gray-600">
-                          📍 {event.location}
-                        </span>
-                      </div>
-
-                      {/* Rendered description */}
-                      <div className="mb-6">
+                      <p className="text-gray-600 italic mb-4">
+                        {event.caption}
+                      </p>
+                      <div className="text-gray-700 text-sm space-y-2">
                         {renderDescription(event.description)}
                       </div>
+                    </div>
 
-                      {/* Updated button section - handles all cases */}
-                      {user?.role === "recruiter" ? (
-                        <>
-                          <Button
-                            onPress={onOpen}
-                            color="danger"
-                            variant="flat"
-                          >
-                            Annuler l'événement
-                          </Button>
-                          <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-                            <ModalContent>
-                              {(onClose) => (
-                                <>
-                                  <ModalHeader className="flex flex-col gap-1">
-                                    Confirmer l'annulation
-                                  </ModalHeader>
-                                  <ModalBody>
-                                    <p>
+                    {/* Right: Details */}
+                    <div className="bg-gray-50 p-4 rounded-md shadow-sm text-sm text-gray-700 space-y-2">
+                      <p>
+                        <strong>📅 Date :</strong>{" "}
+                        {formatDate(event.start_date)} →{" "}
+                        {formatDate(event.end_date)}
+                      </p>
+                      {event.location === "" ? (
+                        <span> En ligne</span>
+                      ) : (
+                        <p>
+                          <strong>📍 Lieu :</strong> {event.location}
+                        </p>
+                      )}
+                      {/* Bottom Buttons */}
+                      <div className="mt-6">
+                        {user?.role === "recruiter" ? (
+                          <>
+                            <Button
+                              onPress={onOpen}
+                              color="danger"
+                              variant="flat"
+                            >
+                              Annuler l'événement
+                            </Button>
+                            <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+                              <ModalContent>
+                                {(onClose) => (
+                                  <>
+                                    <ModalHeader className="flex flex-col gap-1">
+                                      Confirmer l'annulation
+                                    </ModalHeader>
+                                    <ModalBody>
                                       Êtes-vous sûr de vouloir annuler cet
                                       événement ? Cette action est irréversible.
-                                    </p>
-                                  </ModalBody>
-                                  <ModalFooter>
-                                    <Button
-                                      color="danger"
-                                      variant="light"
-                                      onPress={onClose}
-                                    >
-                                      Non
-                                    </Button>
-                                    <Button
-                                      color="primary"
-                                      onPress={AnnulerEvenement}
-                                      variant="flat"
-                                    >
-                                      Oui
-                                    </Button>
-                                  </ModalFooter>
-                                </>
-                              )}
-                            </ModalContent>
-                          </Modal>
-                        </>
-                      ) : (
-                        <Button
-                          className="mt-4"
-                          color="primary"
-                          variant="flat"
-                          isDisabled={isRegistered}
-                          onPress={() => {
-                            if (user?.role === "talent") {
-                              onOpenCvModal();
-                            } else if (!isRegistered) {
-                              onOpenRegistrationModal();
-                            }
-                          }}
-                        >
-                          {isRegistered ? "Déjà inscrit" : "S'inscrire"}
-                        </Button>
-                      )}
-                    </section>
+                                    </ModalBody>
+                                    <ModalFooter>
+                                      <Button
+                                        color="danger"
+                                        variant="light"
+                                        onPress={onClose}
+                                      >
+                                        Non
+                                      </Button>
+                                      <Button
+                                        color="primary"
+                                        onPress={AnnulerEvenement}
+                                        variant="flat"
+                                      >
+                                        Oui
+                                      </Button>
+                                    </ModalFooter>
+                                  </>
+                                )}
+                              </ModalContent>
+                            </Modal>
+                          </>
+                        ) : (
+                          <Button
+                            className="mt-4"
+                            color="primary"
+                            variant="flat"
+                            isDisabled={isRegistered}
+                            onPress={() => {
+                              if (user?.role === "talent") {
+                                onOpenCvModal();
+                              } else if (!isRegistered) {
+                                onOpenRegistrationModal();
+                              }
+                            }}
+                          >
+                            {isRegistered ? "Déjà inscrit" : "S'inscrire"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
-            {/* Sidebar */}
-            {/* <div className="lg:col-span-1"> */}
-            {/* <div className="bg-white shadow-md rounded-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Navigation
-                </h2>
-                <ul className="space-y-3">
-                  <li>
-                    <a
-                      href="#about"
-                      className="flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 p-2 rounded transition-colors"
-                    >
-                      <span>ℹ️</span>À propos
-                    </a>
-                  </li>
-                  {user && user.role === "recruiter" && (
-                    <li>
-                      <a
-                        href="#participants"
-                        className="flex items-center gap-4 text-gray-700 hover:text-blue-600 hover:bg-blue-50 p-2 rounded transition-colors"
-                      >
-                        <span>
-                          <Users />
-                        </span>
-                        Participants
-                      </a>
-                    </li>
-                  )}
-                </ul>
-              </div> */}
-            {/* QR Code Section
-              {user && user.role === "recruiter" && (
-                <div className="bg-white shadow-md rounded-lg p-6 mt-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4 items-center">
-                      QR Code
-                    </h2>
-                    <Button
-                      onClick={downloadQRCode}
-                      variant="flat"
-                      color="primary"
-                      className="flex items-center gap-2 text-white rounded-md transition-colors"
-                    >
-                      <Download size={16} color="blue" />
-                    </Button>
-                  </div>
-                  <div ref={qrCodeRef} className="flex flex-col items-center">
-                    <QRCode value={`${apiUrl}${event.id}/`} size={128} />
-                  </div>
-                </div>
-              )} */}
-            {/* </div> */}
 
             {/* Main Content */}
             <div className="lg:col-span-2"></div>
@@ -753,6 +993,14 @@ export default function EventDetailsPage() {
               <p className="text-gray-700">
                 Vous voulez conserver le même CV ou importer un autre ?
               </p>
+              <div className="mt-4">
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={handleFileSelect}
+                  className="block w-full text-sm text-gray-700 bg-white border border-gray-300 rounded-md p-2"
+                />
+              </div>
             </ModalBody>
             <ModalFooter>
               <Button
@@ -766,65 +1014,75 @@ export default function EventDetailsPage() {
                 color="secondary"
                 onPress={() => handleCvChoice("import")}
               >
-                Importer un autre CV
+                Importer le CV sélectionné
               </Button>
             </ModalFooter>
           </ModalContent>
         </Modal>
 
         {/* Registration Modal for unauthenticated users */}
-        <Modal
-          isOpen={isRegistrationModalOpen}
-          onOpenChange={onOpenChangeRegistrationModal}
-          size="lg"
-        >
-          <ModalContent>
-            <ModalHeader className="flex flex-col gap-1">
-              Inscription à l'événement
-            </ModalHeader>
-            <ModalBody>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.target as HTMLFormElement);
-                  handleRegistrationSubmit({
-                    first_name: formData.get("first_name") as string,
-                    last_name: formData.get("last_name") as string,
-                    email: formData.get("email") as string,
-                    phone: formData.get("phone") as string,
-                    resume: formData.get("resume") as File,
-                  });
-                }}
-                className="space-y-4"
-              >
-                <Input label="Prénom" name="first_name" required />
+        {!user?.hasAccount && (
+          <Modal
+            isOpen={isRegistrationModalOpen}
+            onOpenChange={onOpenChangeRegistrationModal}
+            size="lg"
+          >
+            <ModalContent>
+              <ModalHeader className="flex flex-col gap-1">
+                Inscription à l'événement
+              </ModalHeader>
+              <ModalBody>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target as HTMLFormElement);
+                    handleRegistrationSubmit({
+                      full_name: formData.get("full_name") as string,
+                      email: formData.get("email") as string,
+                      phone: formData.get("phone") as string,
+                      etablissement: formData.get("etablissement") as string,
+                      filiere: formData.get("filiere") as string,
+                      resume: formData.get("resume") as File,
+                    });
+                  }}
+                  className="space-y-4"
+                >
+                  <Input label="Full Name" name="full_name" required />
 
-                <Input label="Nom" name="last_name" required />
+                  <Input label="Email" name="email" type="email" required />
 
-                <Input label="Email" name="email" type="email" required />
+                  <Input label="Téléphone" name="phone" required />
 
-                <Input label="Téléphone" name="phone" required />
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    CV (PDF, DOC, DOCX)
-                  </label>
-                  <input
-                    type="file"
-                    name="resume"
-                    accept=".pdf,.doc,.docx"
+                  <Input
+                    type="text"
+                    label="Etablissement"
+                    name="etablissement"
                     required
-                    className="block w-full text-sm text-gray-700 bg-white border border-gray-300 rounded-md p-2"
                   />
-                </div>
+                  <Input type="text" label="Filière" name="filiere" required />
 
-                <Button type="submit" color="primary">
-                  Soumettre
-                </Button>
-              </form>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      CV (PDF, DOC, DOCX)
+                    </label>
+                    <input
+                      type="file"
+                      name="resume"
+                      accept=".pdf,.doc,.docx"
+                      required
+                      className="block w-full text-sm text-gray-700 bg-white border border-gray-300 rounded-md p-2"
+                    />
+                  </div>
+
+                  <Button type="submit" color="primary">
+                    Soumettre
+                  </Button>
+                </form>
+              </ModalBody>
+            </ModalContent>
+          </Modal>
+        )}
+
         <Modal isOpen={isConfirmModalOpen} onOpenChange={onCloseConfirmModal}>
           <ModalContent>
             <ModalHeader className="flex flex-col gap-1">

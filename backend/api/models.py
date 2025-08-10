@@ -23,21 +23,23 @@ class Talent(models.Model):
     name = models.CharField(max_length=100, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
     phone = models.CharField(max_length=15, null=True, blank=True)
+    etablissement = models.CharField(max_length=100,null=True, blank=True)
+    filiere = models.CharField(max_length=200, null=True,blank=True)
     resume = models.FileField(upload_to='resumes/', null=True, blank=True)
 
 class Participation(models.Model):
-    talent = models.ForeignKey(Talent, on_delete=models.CASCADE)
-    event = models.ForeignKey(Event, on_delete=models.CASCADE)
-    is_attending = models.BooleanField(default=False)
+    talent_id = models.ForeignKey(Talent, on_delete=models.CASCADE)
+    event_id = models.ForeignKey(Event, on_delete=models.CASCADE)
+    has_attended = models.BooleanField(default=False)
     date_inscription = models.DateTimeField(auto_now_add=True)
     note = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(5)])
-    comment = models.TextField(null=True, blank=True)
+    comment = models.TextField(default="",null=True, blank=True)
     is_selected = models.BooleanField(default=False)
     rdv = models.TimeField(null=True, blank=True)
     event_time_slot = models.ForeignKey('TimeSlot', on_delete=models.CASCADE, null=True, blank=True)
 
     class Meta:
-        unique_together = ('talent', 'event')
+        unique_together = ('talent_id', 'event_id')
 
 class TimeSlot(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE)
