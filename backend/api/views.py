@@ -124,6 +124,23 @@ class TalentDetailView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
     
+def generate_rdv_slots(start_time, end_time, recruiters_count, rdv_duration_minutes):
+    slots = []
+    base_date = datetime(2000, 1, 1)
+    current_time = datetime.combine(base_date, start_time)
+    end_time_dt = datetime.combine(base_date, end_time)
+
+    while current_time < end_time_dt:
+        for recruiter in range(recruiters_count):
+            slots.append({
+                "start": current_time.time(),
+                "end": (current_time + timedelta(minutes=rdv_duration_minutes)).time(),
+                "recruiter": recruiter + 1
+            })
+        current_time += timedelta(minutes=rdv_duration_minutes)
+
+    return slots
+    
 class ParticipationView(APIView):
     
     def get(self, request):
@@ -136,79 +153,89 @@ class ParticipationView(APIView):
     
 
     def post(self, request):
-        # Create Talent
         talent_id = request.data.get('talent_id')
         event_id = request.data.get('event_id')
+        
+        try:
+            event = Event.objects.get(id=event_id)
+        except Event.DoesNotExist:
+            return Response({'error': 'Event not found'}, status=404)
 
+        # Case 1: Existing talent
         if talent_id:
             try:
-                talent= Talent.objects.get(id=talent_id)
-                participation = Participation.objects.create(
-                    talent_id=talent,
-                    event_id=Event.objects.get(id=event_id)
-                )
-
+                talent = Talent.objects.get(id=talent_id)
             except Talent.DoesNotExist:
                 return Response({'error': 'Talent not found'}, status=404)
-
-        talent_serializer = TalentSerializer(data=request.data)
-        if talent_serializer.is_valid():
+        # Case 2: New talent
+        else:
+            talent_serializer = TalentSerializer(data=request.data)
+            if not talent_serializer.is_valid():
+                return Response(talent_serializer.errors, status=400)
             talent = talent_serializer.save()
 
-            event = Event.objects.get(id=event_id)
+        if Participation.objects.filter(talent_id=talent, event_id=event).exists():
+            return Response({'error': 'Already registered for this event'}, status=400)
 
-            if event.is_timeSlot_enabled:
-                available_slot = (
-                    TimeSlot.objects
-                    .filter(event=event)
-                    .exclude(participation__isnull=False)
-                    .order_by('start_time')
-                    .first()
-                )
+        participation_data = {
+            'talent_id': talent,
+            'event_id': event
+        }
 
-                if not available_slot:
-                    return Response({'error': 'No available time slots'}, status=400)
+        if event.is_timeSlot_enabled:
+            time_slot = TimeSlot.objects.filter(event=event).order_by('start_time').first()
+            if not time_slot:
+                return Response({'error': 'No time slots found for this event'}, status=400)
 
-            # Create participation
-                participation = Participation.objects.create(
-                    talent_id=talent,
-                    event_id=event,
-                    rdv=available_slot.start_time,
-                    event_time_slot=available_slot
-                )
+            rdv_slots = generate_rdv_slots(
+                start_time=time_slot.start_time,
+                end_time=time_slot.end_time,
+                recruiters_count=event.recruiters_number,
+                rdv_duration_minutes=time_slot.slot
+            )
 
-                return Response({
-                    'talent': TalentSerializer(talent).data,
-                    'participation': ParticipationSerializer(participation).data
-                }, status=201)
-            else:
-                participation = Participation.objects.create(
-                    talent_id=talent,
-                    event_id=event
-                )
-                return Response({
-                    'talent': TalentSerializer(talent).data,
-                    'participation': ParticipationSerializer(participation).data
-                }, status=201)
+            taken_rdvs = Participation.objects.filter(
+                event_id=event,
+                event_time_slot=time_slot
+            ).values_list('rdv', flat=True)
 
-        return Response(talent_serializer.errors, status=400)
+            available_slot = next(
+                (slot for slot in rdv_slots if slot['start'] not in taken_rdvs),
+                None
+            )
+
+            if not available_slot:
+                return Response({'error': 'No available RDV slots'}, status=400)
+
+            participation_data.update({
+                'rdv': available_slot['start'],
+                'event_time_slot': time_slot
+            })
+
+        participation = Participation.objects.create(**participation_data)
+
+        return Response({
+            'talent_id': TalentSerializer(talent).data,
+            'participation': ParticipationSerializer(participation).data
+        }, status=201)
+
 
 
     
-def generate_rdv_slots(start_time, end_time, recruiters_count, rdv_duration_minutes=15):
-    slots = []
-    current_time = start_time
+# def generate_rdv_slots(start_time, end_time, recruiters_count, rdv_duration_minutes):
+#     slots = []
+#     current_time = start_time
 
-    while current_time < end_time:
-        for recruiter in range(recruiters_count):
-            slots.append({
-                "start": current_time,
-                "end": current_time + timedelta(minutes=rdv_duration_minutes),
-                "recruiter": recruiter + 1  # recruiter ID or index
-            })
-        current_time += timedelta(minutes=rdv_duration_minutes)
+#     while current_time < end_time:
+#         for recruiter in range(recruiters_count):
+#             slots.append({
+#                 "start": current_time,
+#                 "end": current_time + timedelta(minutes=rdv_duration_minutes),
+#                 "recruiter": recruiter + 1  # recruiter ID or index
+#             })
+#         current_time += timedelta(minutes=rdv_duration_minutes)
 
-    return slots
+#     return slots
     
 class ParticipationDetailView(APIView):
     def get(self, request):

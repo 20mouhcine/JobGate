@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import DefaultLayout from "@/layouts/default";
-import { Users, Download, Badge } from "lucide-react";
+import { Users, Download } from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@heroui/button";
 import { useUser } from "@/contexts/UserContext";
@@ -19,13 +19,6 @@ import {
 import { Input } from "@heroui/input";
 import { Image as HeroImage } from "@heroui/image";
 import { Card, CardBody } from "@heroui/card";
-import {
-  Table,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableHeader,
-} from "@heroui/table";
 
 interface Event {
   id: string | number;
@@ -42,7 +35,7 @@ interface Event {
 
 interface Talent {
   id: number;
-  full_name: string;
+  name: string;
   email: string;
   phone: string;
   resume?: string;
@@ -71,6 +64,7 @@ export default function EventDetailsPage() {
   const qrCodeRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const [user_id, setUser_id] = useState(null);
 
   const [participations, setParticipations] = useState<Participations[]>([]);
 
@@ -219,7 +213,6 @@ export default function EventDetailsPage() {
       } else {
         const data = await response.json();
         setParticipations(data);
-        console.log("Participations fetched:", data);
       }
     };
 
@@ -257,21 +250,46 @@ export default function EventDetailsPage() {
     };
 
     fetchEvent();
-  }, [id, apiUrl]);
+  }, [id]);
 
   useEffect(() => {
     const checkRegistrationStatus = async () => {
-      const response = await fetch(
-        `http://localhost:8000/api/participations-details/?talent_id=${user?.id}&event_id=${event?.id}`
-      );
-      if (response.status == 404) {
-        setIsRegistered(false);
+      // Determine which talent ID to use
+      let talentId;
+
+      if (user?.hasAccount) {
+        // Use the logged-in user's ID
+        talentId = user.id;
+      } else if (user_id) {
+        // Use the newly created talent's ID
+        talentId = user_id;
       } else {
-        setIsRegistered(true);
+        // No talent ID available yet
+        return;
+      }
+
+      // Only proceed if we have both talent ID and event ID
+      if (!talentId || !event?.id) return;
+
+      try {
+        const response = await fetch(
+          `http://localhost:8000/api/participations-details/?talent_id=${talentId}&event_id=${event.id}`
+        );
+        const data = await response.json();
+
+        if (data.detail === "Participation not found.") {
+          setIsRegistered(false);
+        } else {
+          setIsRegistered(true);
+        }
+      } catch (error) {
+        console.error("Error checking registration status:", error);
+        setIsRegistered(false);
       }
     };
-    if (user?.id && event?.id) checkRegistrationStatus();
-  }, [user?.id, event?.id]);
+
+    checkRegistrationStatus();
+  }, [user?.id, user?.hasAccount, user_id, event?.id]);
 
   const handleCvChange = async () => {
     if (!newCv) {
@@ -296,6 +314,15 @@ export default function EventDetailsPage() {
     } catch (error) {
       console.error("Error updating CV:", error);
       alert("Erreur lors de la mise à jour du CV");
+    }
+  };
+  const handleRegistrationClick = () => {
+    if (!user?.hasAccount) {
+      onOpenRegistrationModal();
+    } else if (user?.role === "talent") {
+      onOpenCvModal();
+    } else if (!isRegistered) {
+      onOpenRegistrationModal();
     }
   };
 
@@ -328,13 +355,13 @@ export default function EventDetailsPage() {
       }
 
       onCloseConfirmModal();
-      setIsRegistered(true);
       alert("Inscription réussie avec votre CV actuel !");
     } catch (error) {
       console.error("Registration error:", error);
       alert("Erreur lors de l'inscription");
     }
   };
+
   const handleRegistrationSubmit = async (formData: any) => {
     try {
       const form = new FormData();
@@ -354,15 +381,37 @@ export default function EventDetailsPage() {
         }
       );
 
-      if (!response.ok) {
-        throw new Error("Registration failed");
-      }
+      // Handle different response scenarios
+      if (response.ok) {
+        const data = await response.json();
+        setUser_id(data.talent_id.id);
+        onCloseRegistrationModal();
+        setIsRegistered(true);
+        alert("Inscription réussie !");
+      } else {
+        // Handle specific error cases
+        const errorData = await response.json();
 
-      onCloseRegistrationModal();
-      alert("Inscription réussie !");
+        if (errorData.error === "No available time slots") {
+          alert(
+            "Désolé, tous les créneaux horaires sont complets pour cet événement."
+          );
+        } else if (errorData.error === "Already registered for this event") {
+          alert("Vous êtes déjà inscrit à cet événement.");
+          setIsRegistered(true);
+        } else {
+          alert(
+            "Erreur lors de l'inscription: " +
+              (errorData.error || "Erreur inconnue")
+          );
+        }
+
+        onCloseRegistrationModal();
+      }
     } catch (error) {
       console.error("Registration error:", error);
       alert("Erreur lors de l'inscription");
+      onCloseRegistrationModal();
     }
   };
 
@@ -546,180 +595,168 @@ export default function EventDetailsPage() {
             <div className="flex w-full flex-col justify-center items-center">
               {user && user.role === "recruiter" ? (
                 <>
-                <div className="fixed left-0 top-1/2 -translate-y-1/2 z-50 overflow-hidden">
-                                  <Popover placement="left">
-                                    <PopoverTrigger className="bg-blue-600 p-2 rounded-full text-white hover:bg-blue-700 transition-colors font-bold">
-                                      <div className="flex flex-col items-center">
-                                        <span className="sr-only">QR Code</span>
-                                        <QrCode
-                                          size={20}
-                                          className="font-bold"
-                                        />
-                                      </div>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="mt-2">
-                                      <div className="px-1 py-2  space-y-2">
-                                        <div className="text-small font-bold flex justify-between">
-                                          <span>Qr</span>
-                                          <button
-                                            onClick={downloadQRCode}
-                                            color="primary"
-                                            className="flex items-center  text-white rounded-md transition-colors"
-                                          >
-                                            <Download size={16} color="blue" />
-                                          </button>
-                                        </div>
-                                        <div className="text-tiny">
-                                          <div
-                                            ref={qrCodeRef}
-                                            className="flex flex-col items-center"
-                                          >
-                                            <QRCode
-                                              value={`${apiUrl}${event.id}/`}
-                                              size={128}
-                                            />
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </PopoverContent>
-                                  </Popover>
-                                </div>
-                <Tabs aria-label="Options" color="primary" variant="bordered">
-                  <Tab
-                    key="a props"
-                    title={
-                      <div className="flex items-center space-x-2">
-                        <span>A Propos</span>
-                      </div>
-                    }
-                  >
-                    <div className="bg-white shadow-md rounded-lg overflow-hidden p-6">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-                        {/* Left: Image */}
-                        <div>
-                          <HeroImage
-                            src={`http://127.0.0.1:8000${event.image}`}
-                            className="w-full h-64 object-cover rounded-md"
-                          />
+                  <div className="fixed left-0 top-1/2 -translate-y-1/2 z-50 overflow-hidden">
+                    <Popover placement="left">
+                      <PopoverTrigger className="bg-blue-600 p-2 rounded-full text-white hover:bg-blue-700 transition-colors font-bold">
+                        <div className="flex flex-col items-center">
+                          <span className="sr-only">QR Code</span>
+                          <QrCode size={20} className="font-bold" />
                         </div>
-
-                        {/* Center: Title and Description */}
-                        <div className="col-span-1">
-                          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-                            {event.title}
-                          </h2>
-                          <p className="text-gray-600 italic mb-4">
-                            {event.caption}
-                          </p>
-                          <div className="text-gray-700 text-sm space-y-2">
-                            {renderDescription(event.description)}
+                      </PopoverTrigger>
+                      <PopoverContent className="mt-2">
+                        <div className="px-1 py-2  space-y-2">
+                          <div className="text-small font-bold flex justify-between">
+                            <span>Qr</span>
+                            <button
+                              onClick={downloadQRCode}
+                              color="primary"
+                              className="flex items-center  text-white rounded-md transition-colors"
+                            >
+                              <Download size={16} color="blue" />
+                            </button>
+                          </div>
+                          <div className="text-tiny">
+                            <div
+                              ref={qrCodeRef}
+                              className="flex flex-col items-center"
+                            >
+                              <QRCode
+                                value={`${apiUrl}${event.id}/`}
+                                size={128}
+                              />
+                            </div>
                           </div>
                         </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <Tabs aria-label="Options" color="primary" variant="bordered">
+                    <Tab
+                      key="a props"
+                      title={
+                        <div className="flex items-center space-x-2">
+                          <span>A Propos</span>
+                        </div>
+                      }
+                    >
+                      <div className="bg-white shadow-md rounded-lg overflow-hidden p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                          {/* Left: Image */}
+                          <div>
+                            <HeroImage
+                              src={`http://127.0.0.1:8000${event.image}`}
+                              className="w-full h-64 object-cover rounded-md"
+                            />
+                          </div>
 
-                        {/* Right: Details */}
-                        <div className="bg-gray-50 p-4 rounded-md shadow-sm text-sm text-gray-700 space-y-2">
-                          <p>
-                            <strong>📅 Date :</strong>{" "}
-                            {formatDate(event.start_date)} →{" "}
-                            {formatDate(event.end_date)}
-                          </p>
-                          {event.location === "" ? (
-                            <span> En ligne</span>
-
-                          ) : (
-                            <p>
-                              <strong>📍 Lieu :</strong> {event.location}
+                          {/* Center: Title and Description */}
+                          <div className="col-span-1">
+                            <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                              {event.title}
+                            </h2>
+                            <p className="text-gray-600 italic mb-4">
+                              {event.caption}
                             </p>
-                          )}
-                          {/* Bottom Buttons */}
-                          <div className="mt-6">
-                            {user?.role === "recruiter" ? (
-                              <>
-                                
-                                <Button
-                                  onPress={onOpen}
-                                  color="danger"
-                                  variant="flat"
-                                >
-                                  Annuler l'événement
-                                </Button>
-                                <Modal
-                                  isOpen={isOpen}
-                                  onOpenChange={onOpenChange}
-                                >
-                                  <ModalContent>
-                                    {(onClose) => (
-                                      <>
-                                        <ModalHeader className="flex flex-col gap-1">
-                                          Confirmer l'annulation
-                                        </ModalHeader>
-                                        <ModalBody>
-                                          Êtes-vous sûr de vouloir annuler cet
-                                          événement ? Cette action est
-                                          irréversible.
-                                        </ModalBody>
-                                        <ModalFooter>
-                                          <Button
-                                            color="danger"
-                                            variant="light"
-                                            onPress={onClose}
-                                          >
-                                            Non
-                                          </Button>
-                                          <Button
-                                            color="primary"
-                                            onPress={AnnulerEvenement}
-                                            variant="flat"
-                                          >
-                                            Oui
-                                          </Button>
-                                        </ModalFooter>
-                                      </>
-                                    )}
-                                  </ModalContent>
-                                </Modal>
-                              </>
+                            <div className="text-gray-700 text-sm space-y-2">
+                              {renderDescription(event.description)}
+                            </div>
+                          </div>
+
+                          {/* Right: Details */}
+                          <div className="bg-gray-50 p-4 rounded-md shadow-sm text-sm text-gray-700 space-y-2">
+                            <p>
+                              <strong>📅 Date :</strong>{" "}
+                              {formatDate(event.start_date)} →{" "}
+                              {formatDate(event.end_date)}
+                            </p>
+                            {event.location === "" ? (
+                              <span> En ligne</span>
                             ) : (
-                              <Button
-                                className="mt-4"
-                                color="primary"
-                                variant="flat"
-                                isDisabled={isRegistered}
-                                onPress={() => {
-                                  if (user?.role === "talent") {
-                                    onOpenCvModal();
-                                  } else if (!isRegistered) {
-                                    onOpenRegistrationModal();
-                                  }
-                                }}
-                              >
-                                {isRegistered ? "Déjà inscrit" : "S'inscrire"}
-                              </Button>
+                              <p>
+                                <strong>📍 Lieu :</strong> {event.location}
+                              </p>
                             )}
+                            {/* Bottom Buttons */}
+                            <div className="mt-6">
+                              {user?.role === "recruiter" ? (
+                                <>
+                                  <Button
+                                    onPress={onOpen}
+                                    color="danger"
+                                    variant="flat"
+                                  >
+                                    Annuler l'événement
+                                  </Button>
+                                  <Modal
+                                    isOpen={isOpen}
+                                    onOpenChange={onOpenChange}
+                                  >
+                                    <ModalContent>
+                                      {(onClose) => (
+                                        <>
+                                          <ModalHeader className="flex flex-col gap-1">
+                                            Confirmer l'annulation
+                                          </ModalHeader>
+                                          <ModalBody>
+                                            Êtes-vous sûr de vouloir annuler cet
+                                            événement ? Cette action est
+                                            irréversible.
+                                          </ModalBody>
+                                          <ModalFooter>
+                                            <Button
+                                              color="danger"
+                                              variant="light"
+                                              onPress={onClose}
+                                            >
+                                              Non
+                                            </Button>
+                                            <Button
+                                              color="primary"
+                                              onPress={AnnulerEvenement}
+                                              variant="flat"
+                                            >
+                                              Oui
+                                            </Button>
+                                          </ModalFooter>
+                                        </>
+                                      )}
+                                    </ModalContent>
+                                  </Modal>
+                                </>
+                              ) : (
+                                <Button
+                                  className="mt-4"
+                                  color="primary"
+                                  variant="flat"
+                                  isDisabled={isRegistered}
+                                  onPress={handleRegistrationClick}
+                                >
+                                  {isRegistered ? "Déjà inscrit" : "S'inscrire"}
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </Tab>
-                  <Tab
-                    key="Participants"
-                    title={
-                      <div className="flex items-center space-x-2">
-                        <Users width={20} height={20} />
-                        <span>Participants</span>
-                      </div>
-                    }
-                  >
-                    <Card className="mt-6 shadow-md">
-                      <CardBody>
-                        <h2 className="text-xl font-semibold mb-4">
-                          Liste des participants
-                        </h2>
+                    </Tab>
+                    <Tab
+                      key="Participants"
+                      title={
+                        <div className="flex items-center space-x-2">
+                          <Users width={20} height={20} />
+                          <span>Participants</span>
+                        </div>
+                      }
+                    >
+                      <Card className="mt-6 shadow-md">
+                        <CardBody>
+                          <h2 className="text-xl font-semibold mb-4">
+                            Liste des participants
+                          </h2>
 
+                          {/* TODO: IMPLEMENT SEARCH FUNCTIONALITY */}
 
-{/* TODO: IMPLEMENT SEARCH FUNCTIONALITY */}
-
-                        {/* <div className="mb-4 flex justify-between items-center">
+                          {/* <div className="mb-4 flex justify-between items-center">
                           <Input
                             type="search"
                             placeholder="Rechercher un participant..."
@@ -738,141 +775,138 @@ export default function EventDetailsPage() {
                             }}
                           />
                         </div> */}
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                  Nom
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                  Email
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                  Téléphone
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                  CV
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                  Etablissment
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                  Filière
-                                </th>
-                                {event.is_timeSlot_enabled && (
-
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                  RDV
-                                </th>
-                                )}
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                  Sélection
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {Array.isArray(participations) &&
-                              participations.length > 0 ? (
-                                participations.map((p) => (
-                                  <tr
-                                    key={p.id}
-                                    className="hover:bg-gray-50 transition-colors"
-                                  >
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                      {p.talent_id.full_name}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                      {p.talent_id.email}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                      {p.talent_id.phone}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                      {p.talent_id.resume ? (
-                                        <a
-                                          href={p.talent_id.resume}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-blue-600 underline hover:text-blue-800 transition-colors"
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                    Nom
+                                  </th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                    Email
+                                  </th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                    Téléphone
+                                  </th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                    CV
+                                  </th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                    Etablissment
+                                  </th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                    Filière
+                                  </th>
+                                  {event.is_timeSlot_enabled && (
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                      RDV
+                                    </th>
+                                  )}
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                    Sélection
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {Array.isArray(participations) &&
+                                participations.length > 0 ? (
+                                  participations.map((p) => (
+                                    <tr
+                                      key={p.id}
+                                      className="hover:bg-gray-50 transition-colors"
+                                    >
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {p.talent_id.name}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {p.talent_id.email}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {p.talent_id.phone}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        {p.talent_id.resume ? (
+                                          <a
+                                            href={p.talent_id.resume}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 underline hover:text-blue-800 transition-colors"
+                                          >
+                                            Voir CV
+                                          </a>
+                                        ) : (
+                                          <span className="text-gray-400 italic">
+                                            Aucun CV
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {p.talent_id.etablissement || "—"}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <span
+                                          className="max-w-xs truncate"
+                                          title={p.comment || "—"}
                                         >
-                                          Voir CV
-                                        </a>
-                                      ) : (
-                                        <span className="text-gray-400 italic">
-                                          Aucun CV
+                                          {p.talent_id.filiere || "—"}
                                         </span>
+                                      </td>
+                                      {event.is_timeSlot_enabled && (
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                          {p.rdv || "—"}
+                                        </td>
                                       )}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                      {p.talent_id.etablissement || "—"}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                      <span
-                                        className="max-w-xs truncate"
-                                        title={p.comment || "—"}
-                                      >
-                                        {p.talent_id.filiere || "—"}
-                                      </span>
-                                    </td>
-                                    {event.is_timeSlot_enabled && (
-                                      
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                      {p.rdv || "—"}
-                                    </td>
-                                      )}
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                      <span
-                                        className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                                          p.is_selected
-                                            ? "bg-green-100 text-green-800 border border-green-200"
-                                            : "bg-red-100 text-red-800 border border-red-200"
-                                        }`}
-                                      >
-                                        {p.is_selected
-                                          ? "✅ Sélectionné"
-                                          : "❌ Non sélectionné"}
-                                      </span>
+                                      <td className="px-6 py-4 whitespace-nowrap">
+                                        <span
+                                          className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
+                                            p.is_selected
+                                              ? "bg-green-100 text-green-800 border border-green-200"
+                                              : "bg-red-100 text-red-800 border border-red-200"
+                                          }`}
+                                        >
+                                          {p.is_selected
+                                            ? "✅ Sélectionné"
+                                            : "❌ Non sélectionné"}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td
+                                      colSpan={8}
+                                      className="px-6 py-12 text-center"
+                                    >
+                                      <div className="flex flex-col items-center justify-center">
+                                        <div className="text-gray-400 text-4xl mb-2">
+                                          👥
+                                        </div>
+                                        <p className="text-gray-500 text-sm">
+                                          Aucun participant trouvé pour cet
+                                          événement
+                                        </p>
+                                      </div>
                                     </td>
                                   </tr>
-                                ))
-                              ) : (
-                                <tr>
-                                  <td
-                                    colSpan={8}
-                                    className="px-6 py-12 text-center"
-                                  >
-                                    <div className="flex flex-col items-center justify-center">
-                                      <div className="text-gray-400 text-4xl mb-2">
-                                        👥
-                                      </div>
-                                      <p className="text-gray-500 text-sm">
-                                        Aucun participant trouvé pour cet
-                                        événement
-                                      </p>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </CardBody>
+                      </Card>{" "}
+                    </Tab>
+                    <Tab
+                      key="videos"
+                      title={
+                        <div className="flex items-center space-x-2">
+                          <span>Statistiques</span>
                         </div>
-                      </CardBody>
-                    </Card>{" "}
-                  </Tab>
-                  <Tab
-                    key="videos"
-                    title={
-                      <div className="flex items-center space-x-2">
-                        <span>Statistiques</span>
-                      </div>
-                    }
-                  >
-                    Statistiques
-                  </Tab>
-                </Tabs>
-                                </>
-
+                      }
+                    >
+                      Statistiques
+                    </Tab>
+                  </Tabs>
+                </>
               ) : (
                 <div className="bg-white shadow-md rounded-lg overflow-hidden p-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
@@ -961,7 +995,9 @@ export default function EventDetailsPage() {
                             variant="flat"
                             isDisabled={isRegistered}
                             onPress={() => {
-                              if (user?.role === "talent") {
+                              if (!user?.hasAccount) {
+                                onOpenRegistrationModal();
+                              } else if (user?.role === "talent") {
                                 onOpenCvModal();
                               } else if (!isRegistered) {
                                 onOpenRegistrationModal();
