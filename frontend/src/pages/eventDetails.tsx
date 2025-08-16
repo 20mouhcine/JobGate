@@ -854,6 +854,7 @@ export default function EventDetailsPage() {
                                       {event.is_timeSlot_enabled && (
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                           {p.rdv || "—"}
+                                        
                                         </td>
                                       )}
                                       <td className="px-6 py-4 whitespace-nowrap">
