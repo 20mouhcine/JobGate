@@ -1,5 +1,2 @@
 env
-venv/
-*.pyc
-__pycache__/
 backend/media/

@@ -30,10 +30,8 @@ export default function EventCard({ event }: { event?: any }) {
         <small className="text-default-500">
           {event?.location || "Casablanca"}
         </small>
-        <div className="text-gray-600 text-md line-clamp-3"
-        dangerouslySetInnerHTML={{ __html: event?.description || "description description description" }}
-        >
-        </div>
+        
+          <p>{event?.caption}</p>
 
         <div className="flex justify-end">
           <Link to={`/events/${event?.id}`}>

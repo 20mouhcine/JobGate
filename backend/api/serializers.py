@@ -4,7 +4,7 @@ from .models import Event, Talent, Participation, TimeSlot
 class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
-        fields = ['id', 'image','caption','title', 'description', 'start_date','end_date', 'location', 'recruiterId','is_timeSlot_enabled','is_online','recruiters_number']
+        fields = ['id', 'image','caption','title', 'description', 'start_date','end_date', 'location', 'recruiterId','is_timeSlot_enabled','is_online','recruiters_number','meeting_link']
         read_only_fields = ['id'] 
 
 class TalentSerializer(serializers.ModelSerializer):
@@ -18,7 +18,7 @@ class ParticipationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Participation
         fields = ['id', 'talent_id', 'event_id', 'has_attended', 'date_inscription', 'note', 'comment', 'is_selected', 'rdv','event_time_slot']
-        read_only_fields = ['id', 'date_inscription']
+        read_only_fields = ['id', 'date_inscription','talent_id', 'event_id']
         depth = 1
 
     def to_internal_value(self, data):

@@ -1,7 +1,13 @@
 import { useParams } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import DefaultLayout from "@/layouts/default";
-import { Users, Download } from "lucide-react";
+import {
+  Users,
+  Download,
+  CircleAlert,
+  ChartArea,
+  SearchIcon,
+} from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@heroui/button";
 import { useUser } from "@/contexts/UserContext";
@@ -19,6 +25,7 @@ import {
 import { Input } from "@heroui/input";
 import { Image as HeroImage } from "@heroui/image";
 import { Card, CardBody } from "@heroui/card";
+import { Link } from "react-router-dom";
 
 interface Event {
   id: string | number;
@@ -65,6 +72,11 @@ export default function EventDetailsPage() {
   const { user } = useUser();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const [user_id, setUser_id] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [isLoadingParticipations, setIsLoadingParticipations] = useState(false);
 
   const [participations, setParticipations] = useState<Participations[]>([]);
 
@@ -201,23 +213,59 @@ export default function EventDetailsPage() {
     }
   `;
 
-  useEffect(() => {
-    const fetchParticipations = async () => {
-      if (!id) return;
+  const fetchParticipations = async (page = 1, search = "") => {
+    if (!id) return;
 
-      const response = await fetch(`${apiParticipationsUrl}${id}/`, {
+    setIsLoadingParticipations(true);
+    try {
+      const params = new URLSearchParams();
+      params.append("page", page.toString());
+      if (search.trim()) {
+        params.append("search", search);
+      }
+
+      const response = await fetch(`${apiParticipationsUrl}${id}/?${params}`, {
         method: "GET",
       });
+
       if (response.status === 404) {
         console.log("No participations found for this event.");
-      } else {
+        setParticipations([]);
+        setTotalCount(0);
+        setTotalPages(0);
+      } else if (response.ok) {
         const data = await response.json();
-        setParticipations(data);
+        setParticipations(data.results || []);
+        setTotalCount(data.count || 0);
+        setTotalPages(Math.ceil((data.count || 0) / 4)); // Assuming 4 items per page
+      } else {
+        console.error("Error fetching participations:", response.status);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching participations:", error);
+    } finally {
+      setIsLoadingParticipations(false);
+    }
+  };
 
-    fetchParticipations();
+  useEffect(() => {
+    fetchParticipations(1, ""); // Initial load
   }, [id, user?.id]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1); // Reset to first page on new search
+      fetchParticipations(1, searchQuery);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  // Handle page changes
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    fetchParticipations(newPage, searchQuery);
+  };
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -351,21 +399,37 @@ export default function EventDetailsPage() {
       );
 
       if (!response.ok) {
-        throw new Error("Registration failed");
+        // Get the actual error message from the backend
+        const errorData = await response.json();
+        console.error("Backend error:", errorData);
+
+        // Show the specific error message
+        const errorMessage =
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage);
       }
+
+      const data = await response.json();
+      console.log("Registration successful:", data);
 
       onCloseConfirmModal();
       alert("Inscription réussie avec votre CV actuel !");
     } catch (error) {
       console.error("Registration error:", error);
-      alert("Erreur lors de l'inscription");
+
+      // Show the actual error message to help with debugging
+      if (error instanceof Error) {
+        alert(`Erreur lors de l'inscription: ${error.message}`);
+      } else {
+        alert("Erreur lors de l'inscription");
+      }
     }
   };
 
   const handleRegistrationSubmit = async (formData: any) => {
     try {
       const form = new FormData();
-      form.append("full_name", formData.full_name);
+      form.append("name", formData.name);
       form.append("email", formData.email);
       form.append("phone", formData.phone);
       form.append("resume", formData.resume);
@@ -415,6 +479,7 @@ export default function EventDetailsPage() {
     }
   };
 
+  console.log("participations:", participations);
   // Function to clean and render HTML content from ReactQuill
   const renderDescription = (htmlContent: string) => {
     if (!htmlContent) return null;
@@ -516,6 +581,11 @@ export default function EventDetailsPage() {
       setError("Failed to cancel the event. Please try again later.");
     }
   };
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+  };
+
+  const filteredParticipations = participations;
 
   // Loading state
   if (isLoading) {
@@ -595,9 +665,9 @@ export default function EventDetailsPage() {
             <div className="flex w-full flex-col justify-center items-center">
               {user && user.role === "recruiter" ? (
                 <>
-                  <div className="fixed left-0 top-1/2 -translate-y-1/2 z-50 overflow-hidden">
+                  <div className="fixed left-0 top-1/2 -translate-y-1/2 z-50 overflow-hidden hover:scale-110 transition-all duration-500">
                     <Popover placement="left">
-                      <PopoverTrigger className="bg-blue-600 p-2 rounded-full text-white hover:bg-blue-700 transition-colors font-bold">
+                      <PopoverTrigger className="bg-blue-600 p-2 rounded-r-lg text-white hover:bg-blue-700 transition-colors font-bold">
                         <div className="flex flex-col items-center">
                           <span className="sr-only">QR Code</span>
                           <QrCode size={20} className="font-bold" />
@@ -632,9 +702,10 @@ export default function EventDetailsPage() {
                   </div>
                   <Tabs aria-label="Options" color="primary" variant="bordered">
                     <Tab
-                      key="a props"
+                      key="a propos"
                       title={
                         <div className="flex items-center space-x-2">
+                          <CircleAlert width={20} height={20} />
                           <span>A Propos</span>
                         </div>
                       }
@@ -754,152 +825,232 @@ export default function EventDetailsPage() {
                             Liste des participants
                           </h2>
 
-                          {/* TODO: IMPLEMENT SEARCH FUNCTIONALITY */}
-
-                          {/* <div className="mb-4 flex justify-between items-center">
-                          <Input
-                            type="search"
-                            placeholder="Rechercher un participant..."
-                            className="max-w-xs"
-                            size="sm"
-                            startContent={<span className="text-gray-400">🔍</span>}
-                            onChange={(e) => {
-                              const searchValue = e.target.value.toLowerCase();
-                              setParticipations(participations.filter(p => 
-                                p.talent_id.full_name.toLowerCase().includes(searchValue) ||
-                                p.talent_id.email.toLowerCase().includes(searchValue) ||
-                                p.talent_id.phone.toLowerCase().includes(searchValue) ||
-                                (p.talent_id.etablissement && p.talent_id.etablissement.toLowerCase().includes(searchValue)) ||
-                                (p.talent_id.filiere && p.talent_id.filiere.toLowerCase().includes(searchValue))
-                              ));
-                            }}
-                          />
-                        </div> */}
-                          <div className="overflow-x-auto">
-                            <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                    Nom
-                                  </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                    Email
-                                  </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                    Téléphone
-                                  </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                    CV
-                                  </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                    Etablissment
-                                  </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                    Filière
-                                  </th>
-                                  {event.is_timeSlot_enabled && (
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                      RDV
-                                    </th>
-                                  )}
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                    Sélection
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                {Array.isArray(participations) &&
-                                participations.length > 0 ? (
-                                  participations.map((p) => (
-                                    <tr
-                                      key={p.id}
-                                      className="hover:bg-gray-50 transition-colors"
-                                    >
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        {p.talent_id.name}
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {p.talent_id.email}
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {p.talent_id.phone}
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                        {p.talent_id.resume ? (
-                                          <a
-                                            href={p.talent_id.resume}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 underline hover:text-blue-800 transition-colors"
-                                          >
-                                            Voir CV
-                                          </a>
-                                        ) : (
-                                          <span className="text-gray-400 italic">
-                                            Aucun CV
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {p.talent_id.etablissement || "—"}
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        <span
-                                          className="max-w-xs truncate"
-                                          title={p.comment || "—"}
-                                        >
-                                          {p.talent_id.filiere || "—"}
-                                        </span>
-                                      </td>
-                                      {event.is_timeSlot_enabled && (
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                          {p.rdv || "—"}
-                                        
-                                        </td>
-                                      )}
-                                      <td className="px-6 py-4 whitespace-nowrap">
-                                        <span
-                                          className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                                            p.is_selected
-                                              ? "bg-green-100 text-green-800 border border-green-200"
-                                              : "bg-red-100 text-red-800 border border-red-200"
-                                          }`}
-                                        >
-                                          {p.is_selected
-                                            ? "✅ Sélectionné"
-                                            : "❌ Non sélectionné"}
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  ))
-                                ) : (
-                                  <tr>
-                                    <td
-                                      colSpan={8}
-                                      className="px-6 py-12 text-center"
-                                    >
-                                      <div className="flex flex-col items-center justify-center">
-                                        <div className="text-gray-400 text-4xl mb-2">
-                                          👥
-                                        </div>
-                                        <p className="text-gray-500 text-sm">
-                                          Aucun participant trouvé pour cet
-                                          événement
-                                        </p>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
-                              </tbody>
-                            </table>
+                          <div className="mb-4 flex justify-between items-center">
+                            <Input
+                              type="search"
+                              placeholder="Rechercher un participant..."
+                              className="max-w-xs"
+                              size="sm"
+                              startContent={<SearchIcon color="gray" />}
+                              value={searchQuery}
+                              onChange={handleInputChange}
+                            />
+                            <div className="text-sm text-gray-600">
+                              {totalCount > 0 && (
+                                <span>
+                                  {totalCount} participant
+                                  {totalCount > 1 ? "s" : ""} trouvé
+                                  {totalCount > 1 ? "s" : ""}
+                                  {searchQuery && ` pour "${searchQuery}"`}
+                                </span>
+                              )}
+                            </div>
                           </div>
+
+                          {isLoadingParticipations ? (
+                            <div className="flex justify-center py-8">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                                  <thead className="bg-gray-50">
+                                    <tr>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                        Nom
+                                      </th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                        Email
+                                      </th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                        Téléphone
+                                      </th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                        Etablissement
+                                      </th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                        Filière
+                                      </th>
+                                      {event.is_timeSlot_enabled && (
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                          RDV
+                                        </th>
+                                      )}
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                                        Sélection
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-200">
+                                    {Array.isArray(filteredParticipations) &&
+                                    filteredParticipations.length > 0 ? (
+                                      filteredParticipations.map((p) => (
+                                        <tr
+                                          key={p.id}
+                                          className="hover:bg-gray-50 transition-colors"
+                                        >
+                                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            <Link
+                                              to={`participants/${p.talent_id.id}`}
+                                            >
+                                              {p.talent_id.name}
+                                            </Link>
+                                          </td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {p.talent_id.email}
+                                          </td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {p.talent_id.phone}
+                                          </td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {p.talent_id.etablissement || "—"}
+                                          </td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <span
+                                              className="max-w-xs truncate"
+                                              title={p.talent_id.filiere || "—"}
+                                            >
+                                              {p.talent_id.filiere || "—"}
+                                            </span>
+                                          </td>
+                                          {event.is_timeSlot_enabled && (
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                              {p.rdv || "—"}
+                                            </td>
+                                          )}
+                                          <td className="px-6 py-4 whitespace-nowrap">
+                                            <span
+                                              className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
+                                                p.is_selected
+                                                  ? "bg-green-100 text-green-800 border border-green-200"
+                                                  : "bg-red-100 text-red-800 border border-red-200"
+                                              }`}
+                                            >
+                                              {p.is_selected
+                                                ? "✅ Sélectionné"
+                                                : "❌ Non sélectionné"}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))
+                                    ) : (
+                                      <tr>
+                                        <td
+                                          colSpan={
+                                            event.is_timeSlot_enabled ? 7 : 6
+                                          }
+                                          className="px-6 py-12 text-center"
+                                        >
+                                          <div className="flex flex-col items-center justify-center">
+                                            <div className="text-gray-400 text-4xl mb-2">
+                                              👥
+                                            </div>
+                                            <p className="text-gray-500 text-sm">
+                                              {searchQuery
+                                                ? `Aucun participant trouvé pour "${searchQuery}"`
+                                                : "Aucun participant trouvé pour cet événement"}
+                                            </p>
+                                            {searchQuery && (
+                                              <button
+                                                onClick={() =>
+                                                  setSearchQuery("")
+                                                }
+                                                className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
+                                              >
+                                                Effacer la recherche
+                                              </button>
+                                            )}
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              {/* Pagination Controls */}
+                              {totalPages > 1 && (
+                                <div className="mt-6 flex justify-between items-center">
+                                  <div className="text-sm text-gray-600">
+                                    Page {currentPage} sur {totalPages}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="flat"
+                                      isDisabled={currentPage === 1}
+                                      onPress={() =>
+                                        handlePageChange(currentPage - 1)
+                                      }
+                                    >
+                                      Précédent
+                                    </Button>
+
+                                    {/* Page numbers */}
+                                    <div className="flex gap-1">
+                                      {Array.from(
+                                        { length: Math.min(5, totalPages) },
+                                        (_, i) => {
+                                          const page =
+                                            Math.max(
+                                              1,
+                                              Math.min(
+                                                totalPages - 4,
+                                                currentPage - 2
+                                              )
+                                            ) + i;
+                                          if (page <= totalPages) {
+                                            return (
+                                              <Button
+                                                key={page}
+                                                size="sm"
+                                                variant={
+                                                  currentPage === page
+                                                    ? "solid"
+                                                    : "flat"
+                                                }
+                                                color={
+                                                  currentPage === page
+                                                    ? "primary"
+                                                    : "default"
+                                                }
+                                                onPress={() =>
+                                                  handlePageChange(page)
+                                                }
+                                              >
+                                                {page}
+                                              </Button>
+                                            );
+                                          }
+                                          return null;
+                                        }
+                                      )}
+                                    </div>
+
+                                    <Button
+                                      size="sm"
+                                      variant="flat"
+                                      isDisabled={currentPage === totalPages}
+                                      onPress={() =>
+                                        handlePageChange(currentPage + 1)
+                                      }
+                                    >
+                                      Suivant
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )}
                         </CardBody>
-                      </Card>{" "}
+                      </Card>
                     </Tab>
                     <Tab
                       key="videos"
                       title={
                         <div className="flex items-center space-x-2">
+                          <ChartArea />
                           <span>Statistiques</span>
                         </div>
                       }
@@ -1074,7 +1225,7 @@ export default function EventDetailsPage() {
                     e.preventDefault();
                     const formData = new FormData(e.target as HTMLFormElement);
                     handleRegistrationSubmit({
-                      full_name: formData.get("full_name") as string,
+                      name: formData.get("name") as string,
                       email: formData.get("email") as string,
                       phone: formData.get("phone") as string,
                       etablissement: formData.get("etablissement") as string,
@@ -1084,7 +1235,7 @@ export default function EventDetailsPage() {
                   }}
                   className="space-y-4"
                 >
-                  <Input label="Full Name" name="full_name" required />
+                  <Input label="Full Name" name="name" required />
 
                   <Input label="Email" name="email" type="email" required />
 

@@ -369,7 +369,9 @@ export default function EventsPage() {
       if (!eventResponse.ok) {
         const errorData = await eventResponse.text();
         console.error("Server error:", errorData);
-        throw new Error(`HTTP error! status: ${eventResponse.status} - ${errorData}`);
+        throw new Error(
+          `HTTP error! status: ${eventResponse.status} - ${errorData}`
+        );
       }
 
       const newEvent = await eventResponse.json();
@@ -429,7 +431,9 @@ export default function EventsPage() {
       onOpenChange();
     } catch (error) {
       console.error("Error creating event:", error);
-      setError(`Failed to create event: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setError(
+        `Failed to create event: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     } finally {
       setIsLoading(false);
     }
@@ -525,7 +529,8 @@ export default function EventsPage() {
                     <div className="flex flex-col gap-1">
                       <h2 className="text-lg font-semibold">Create Event</h2>
                       <span className="text-default-500 text-sm">
-                        Step {currentStep + 1} of {steps.length}: {steps[currentStep]}
+                        Step {currentStep + 1} of {steps.length}:{" "}
+                        {steps[currentStep]}
                       </span>
                     </div>
 
@@ -535,39 +540,55 @@ export default function EventsPage() {
                         {steps.map((step, index) => (
                           <div
                             key={step}
-                            className={`flex items-center ${index < steps.length - 1 ? 'flex-1' : ''
-                              }`}
+                            className={`flex items-center ${
+                              index < steps.length - 1 ? "flex-1" : ""
+                            }`}
                           >
                             <div className="flex flex-col items-center">
                               <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${index < currentStep
-                                  ? 'bg-success text-white' // Completed steps
-                                  : index === currentStep
-                                    ? 'bg-primary text-white' // Current step
-                                    : 'bg-default-200 text-default-500' // Future steps
-                                  }`}
+                                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${
+                                  index < currentStep
+                                    ? "bg-success text-white" // Completed steps
+                                    : index === currentStep
+                                      ? "bg-primary text-white" // Current step
+                                      : "bg-default-200 text-default-500" // Future steps
+                                }`}
                               >
                                 {index < currentStep ? (
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clipRule="evenodd"
+                                    />
                                   </svg>
                                 ) : (
                                   index + 1
                                 )}
                               </div>
-                              <span className={`text-xs mt-1 text-center max-w-20 ${index === currentStep
-                                ? 'text-primary font-medium'
-                                : 'text-default-500'
-                                }`}>
+                              <span
+                                className={`text-xs mt-1 text-center max-w-20 ${
+                                  index === currentStep
+                                    ? "text-primary font-medium"
+                                    : "text-default-500"
+                                }`}
+                              >
                                 {step}
                               </span>
                             </div>
                             {index < steps.length - 1 && (
                               <div className="flex-1 mx-2">
-                                <div className={`h-0.5 transition-all duration-200 ${index < currentStep
-                                  ? 'bg-success'
-                                  : 'bg-default-200'
-                                  }`} />
+                                <div
+                                  className={`h-0.5 transition-all duration-200 ${
+                                    index < currentStep
+                                      ? "bg-success"
+                                      : "bg-default-200"
+                                  }`}
+                                />
                               </div>
                             )}
                           </div>
@@ -579,7 +600,7 @@ export default function EventsPage() {
                         <div
                           className="bg-primary h-1 rounded-full transition-all duration-300 ease-out"
                           style={{
-                            width: `${((currentStep) / (steps.length - 1)) * 100}%`
+                            width: `${(currentStep / (steps.length - 1)) * 100}%`,
                           }}
                         />
                       </div>
@@ -763,6 +784,7 @@ export default function EventsPage() {
                                     onChange={handleStartTimeChange}
                                     isDisabled={isLoading}
                                     isRequired
+                                    hourCycle={24}
                                     description="Appointment start time"
                                   />
                                   <TimeInput
@@ -770,6 +792,7 @@ export default function EventsPage() {
                                     onChange={handleEndTimeChange}
                                     isDisabled={isLoading}
                                     isRequired
+                                    hourCycle={24}
                                     description="Appointment end time"
                                   />
                                 </div>
@@ -792,7 +815,6 @@ export default function EventsPage() {
                     </div>
                   </ModalBody>
                   <ModalFooter className="sticky bottom-0 bg-white z-10">
-
                     {currentStep > 0 && (
                       <Button onClick={handlePreviousStep} type="button">
                         Previous
