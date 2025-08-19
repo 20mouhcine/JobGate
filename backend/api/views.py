@@ -10,6 +10,7 @@ from django.core.mail import EmailMultiAlternatives
 from rest_framework.generics import ListAPIView
 from rest_framework import filters
 from django.db.models import Q
+from django.utils import timezone
 
 
 
@@ -287,17 +288,23 @@ class TalentDetailView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
     
-def generate_rdv_slots(start_time, end_time, recruiters_count, rdv_duration_minutes):
+def generate_rdv_slots(start_time, end_time, recruiters_count, rdv_duration_minutes, event_date):
     slots = []
-    base_date = datetime(2000, 1, 1)
+    # Use the event's start date as the base date
+    base_date = event_date.date() if hasattr(event_date, 'date') else event_date
     current_time = datetime.combine(base_date, start_time)
     end_time_dt = datetime.combine(base_date, end_time)
+    
+    # Make datetime objects timezone-aware
+    current_time = timezone.make_aware(current_time)
+    end_time_dt = timezone.make_aware(end_time_dt)
 
     while current_time < end_time_dt:
         for recruiter in range(recruiters_count):
+            end_datetime = current_time + timedelta(minutes=rdv_duration_minutes)
             slots.append({
-                "start": current_time.time(),
-                "end": (current_time + timedelta(minutes=rdv_duration_minutes)).time(),
+                "start": current_time,  # Now returns datetime instead of time
+                "end": end_datetime,    # Now returns datetime instead of time
                 "recruiter": recruiter + 1
             })
         current_time += timedelta(minutes=rdv_duration_minutes)
@@ -355,18 +362,30 @@ class ParticipationView(APIView):
                 start_time=time_slot.start_time,
                 end_time=time_slot.end_time,
                 recruiters_count=event.recruiters_number,
-                rdv_duration_minutes=time_slot.slot
+                rdv_duration_minutes=time_slot.slot,
+                event_date=event.start_date
             )
 
+            # Get all taken RDV slots with their recruiter assignments
             taken_rdvs = Participation.objects.filter(
                 event_id=event,
                 event_time_slot=time_slot
             ).values_list('rdv', flat=True)
 
-            available_slot = next(
-                (slot for slot in rdv_slots if slot['start'] not in taken_rdvs),
-                None
-            )
+            # Count how many times each time slot is taken
+            rdv_counts = {}
+            for rdv_datetime in taken_rdvs:
+                if rdv_datetime:
+                    rdv_counts[rdv_datetime] = rdv_counts.get(rdv_datetime, 0) + 1
+
+            # Find an available slot (time slot with less than recruiters_number appointments)
+            available_slot = None
+            for slot in rdv_slots:
+                slot_datetime = slot['start']
+                current_count = rdv_counts.get(slot_datetime, 0)
+                if current_count < event.recruiters_number:
+                    available_slot = slot
+                    break
 
             if not available_slot:
                 return Response({'error': 'No available RDV slots'}, status=400)
@@ -428,7 +447,7 @@ class ParticipationView(APIView):
                                                     <strong>📍 {"En ligne" if event.is_online else "Lieu"} :</strong> 
                                                     {"Réunion virtuelle" if event.is_online else event.location}
                                                 </p>
-                                                {f'<p style="color: #666666; margin: 0; font-size: 14px;"><strong>🕐 Votre RDV :</strong> {participation.rdv.strftime("%H:%M")}</p>' if event.is_timeSlot_enabled else ''}
+                                                {f'<p style="color: #666666; margin: 0; font-size: 14px;"><strong>🕐 Votre RDV :</strong> {participation.rdv.strftime("%d/%m/%Y à %H:%M")}</p>' if event.is_timeSlot_enabled and participation.rdv else ''}
                                             </td>
                                         </tr>
                                     </table>
@@ -517,7 +536,7 @@ class ParticipationView(APIView):
         Date : {event.start_date.strftime('%d/%m/%Y à %H:%M')}
         {f'Mode : En ligne' if event.is_online else f'Lieu : {event.location}'}
         {f'Lien de réunion : {event.meeting_link}' if event.is_online and event.meeting_link else ''}
-        {f'Votre RDV : {participation.rdv.strftime("%H:%M")}' if event.is_timeSlot_enabled else ''}
+        {f'Votre RDV : {participation.rdv.strftime("%d/%m/%Y à %H:%M")}' if event.is_timeSlot_enabled and participation.rdv else ''}
 
         Nous avons hâte de vous voir participer à cet événement !
 

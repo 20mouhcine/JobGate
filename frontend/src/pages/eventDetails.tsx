@@ -58,7 +58,7 @@ interface Participations {
   date_inscription: Date;
   note: number;
   comment: string;
-  rdv: string;
+  rdv: Date;
   is_selected: boolean;
 }
 
@@ -77,10 +77,10 @@ export default function EventDetailsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isLoadingParticipations, setIsLoadingParticipations] = useState(false);
+  const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(false);
 
   const [participations, setParticipations] = useState<Participations[]>([]);
 
-  const [showFileInput, setShowFileInput] = useState(false);
   const [newCv, setNewCv] = useState<File | null>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,14 +88,7 @@ export default function EventDetailsPage() {
       setNewCv(e.target.files[0]);
     }
   };
-  const handleImportConfirm = () => {
-    if (!newCv) {
-      alert("Veuillez sélectionner un fichier CV avant d'importer.");
-      return;
-    }
-    handleCvChange();
-    setShowFileInput(false);
-  };
+
   const {
     isOpen: isCvModalOpen,
     onOpen: onOpenCvModal,
@@ -383,6 +376,8 @@ export default function EventDetailsPage() {
     }
   };
   const confirmKeepCv = async () => {
+    setIsLoadingRegistrations(true);
+    
     try {
       const response = await fetch(
         "http://localhost:8000/api/participations/",
@@ -409,11 +404,10 @@ export default function EventDetailsPage() {
         throw new Error(errorMessage);
       }
 
-      const data = await response.json();
-      console.log("Registration successful:", data);
 
       onCloseConfirmModal();
       alert("Inscription réussie avec votre CV actuel !");
+      setIsRegistered(true);
     } catch (error) {
       console.error("Registration error:", error);
 
@@ -423,10 +417,14 @@ export default function EventDetailsPage() {
       } else {
         alert("Erreur lors de l'inscription");
       }
+    } finally {
+      setIsLoadingRegistrations(false);
     }
   };
 
   const handleRegistrationSubmit = async (formData: any) => {
+    setIsLoadingRegistrations(true);
+    
     try {
       const form = new FormData();
       form.append("name", formData.name);
@@ -436,7 +434,7 @@ export default function EventDetailsPage() {
       form.append("etablissement", formData.etablissement);
       form.append("filiere", formData.filiere);
       form.append("event_id", id!);
-
+      
       const response = await fetch(
         "http://localhost:8000/api/participations/",
         {
@@ -456,7 +454,7 @@ export default function EventDetailsPage() {
         // Handle specific error cases
         const errorData = await response.json();
 
-        if (errorData.error === "No available time slots") {
+        if (errorData.error === "No available RDV slots") {
           alert(
             "Désolé, tous les créneaux horaires sont complets pour cet événement."
           );
@@ -476,10 +474,11 @@ export default function EventDetailsPage() {
       console.error("Registration error:", error);
       alert("Erreur lors de l'inscription");
       onCloseRegistrationModal();
+    } finally {
+      setIsLoadingRegistrations(false);
     }
   };
 
-  console.log("participations:", participations);
   // Function to clean and render HTML content from ReactQuill
   const renderDescription = (htmlContent: string) => {
     if (!htmlContent) return null;
@@ -916,7 +915,11 @@ export default function EventDetailsPage() {
                                           </td>
                                           {event.is_timeSlot_enabled && (
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                              {p.rdv || "—"}
+                                              {p.rdv
+                                                ? new Date(
+                                                    p.rdv
+                                                  ).toLocaleString("fr-FR")
+                                                : "—"}
                                             </td>
                                           )}
                                           <td className="px-6 py-4 whitespace-nowrap">
@@ -1262,8 +1265,8 @@ export default function EventDetailsPage() {
                     />
                   </div>
 
-                  <Button type="submit" color="primary">
-                    Soumettre
+                  <Button type="submit" color="primary" disabled={isLoadingRegistrations}>
+                    {isLoadingRegistrations ? "En cours..." : "Soumettre"}
                   </Button>
                 </form>
               </ModalBody>
@@ -1288,11 +1291,17 @@ export default function EventDetailsPage() {
                 color="danger"
                 variant="light"
                 onPress={onCloseConfirmModal}
+                isDisabled={isLoadingRegistrations}
               >
                 Annuler
               </Button>
-              <Button color="primary" onPress={confirmKeepCv}>
-                Confirmer
+              <Button 
+                color="primary" 
+                onPress={confirmKeepCv}
+                isLoading={isLoadingRegistrations}
+                isDisabled={isLoadingRegistrations}
+              >
+                {isLoadingRegistrations ? "En cours..." : "Confirmer"}
               </Button>
             </ModalFooter>
           </ModalContent>
