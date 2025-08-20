@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 const NavBar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
 
+
   return (
     <div className="fixed top-0 left-0 w-full flex justify-between items-center p-6 shadow-lg z-50 bg-white overflow-hidden">
       <div className="flex items-center space-x-6">
@@ -24,9 +25,9 @@ const NavBar = () => {
         <nav className="hidden md:flex ml-6">
           <ul className="flex space-x-4">
             <li>
-              <a href="#" className="text-gray-700 hover:text-blue-500">
+              <Link to={'/'} className="text-gray-700 hover:text-blue-500">
                 Tableau de bord
-              </a>
+              </Link>
             </li>
             <li>
               <a href="#" className="text-gray-700 hover:text-blue-500">
