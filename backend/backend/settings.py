@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'api', 
     'corsheaders',
-
+    'django_celery_beat',
 ]
 
 MIDDLEWARE = [
@@ -147,4 +147,44 @@ EMAIL_PORT = '2525'
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 4,
+}
+
+# Celery Configuration
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+
+# Celery Beat Settings (for periodic tasks)
+CELERY_BEAT_SCHEDULE = {
+    'send-rdv-reminders': {
+        'task': 'api.tasks.send_rdv_reminders',
+        'schedule': 3600.0,  # Run every hour
+    },
+}
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'rdv_reminders.log',
+        },
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'api.tasks': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
 }

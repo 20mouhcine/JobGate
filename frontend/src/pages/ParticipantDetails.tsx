@@ -3,13 +3,11 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { useParams, useNavigate } from "react-router-dom";
-import { Avatar } from "@heroui/avatar";
 import {
   Modal,
   ModalContent,
   ModalHeader,
   ModalBody,
-  ModalFooter,
   useDisclosure,
 } from "@heroui/modal";
 
@@ -19,21 +17,16 @@ import DefaultLayout from "@/layouts/default";
 import { Worker } from "@react-pdf-viewer/core";
 import { Viewer } from "@react-pdf-viewer/core";
 import {
-  Mail,
-  Phone,
-  MapPin,
-  Calendar,
-  Clock,
   Star,
   Save,
-  X,
-  Download,
   Eye,
   Award,
   AlertCircle,
   Users,
+  CornerDownLeft,
 } from "lucide-react";
 
+import ParticipantInfoCard from "@/components/ParticipantInfoCard";
 // Import the styles
 import "@react-pdf-viewer/core/lib/styles/index.css";
 import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
@@ -135,83 +128,8 @@ const StarRating = ({
   );
 };
 
-// Simple Chip component since @heroui/chip might not be available
-const Chip = ({
-  children,
-  color = "primary",
-  size = "md",
-  onClose,
-  startContent,
-}: {
-  children: React.ReactNode;
-  color?: "primary" | "secondary" | "success" | "warning" | "danger";
-  size?: "sm" | "md" | "lg";
-  onClose?: () => void;
-  startContent?: React.ReactNode;
-}) => {
-  const colorClasses = {
-    primary: "bg-blue-100 text-blue-800 border-blue-200",
-    secondary: "bg-purple-100 text-purple-800 border-purple-200",
-    success: "bg-green-100 text-green-800 border-green-200",
-    warning: "bg-orange-100 text-orange-800 border-orange-200",
-    danger: "bg-red-100 text-red-800 border-red-200",
-  };
-
-  const sizeClasses = {
-    sm: "px-2 py-1 text-xs",
-    md: "px-3 py-1 text-sm",
-    lg: "px-4 py-2 text-base",
-  };
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border ${colorClasses[color]} ${sizeClasses[size]}`}
-    >
-      {startContent}
-      {children}
-      {onClose && (
-        <button
-          onClick={onClose}
-          className="ml-1 hover:bg-black/10 rounded-full p-0.5"
-        >
-          <X size={size === "sm" ? 12 : 14} />
-        </button>
-      )}
-    </span>
-  );
-};
 
 
-const InfoCard = ({
-  icon: Icon,
-  title,
-  value,
-  subtitle,
-  color = "primary",
-}: {
-  icon: React.ComponentType<any>;
-  title: string;
-  value: string | React.ReactNode;
-  subtitle?: string;
-  color?: "primary" | "secondary" | "success" | "warning" | "danger";
-}) => (
-  <Card className="shadow-sm border-1 border-gray-200 hover:shadow-md transition-shadow">
-    <CardBody className="p-4">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg bg-${color}-100`}>
-          <Icon className={`h-5 w-5 text-${color}-600`} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-600 font-medium">{title}</p>
-          <p className="text-base font-semibold text-gray-900 truncate">
-            {value}
-          </p>
-          {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
-        </div>
-      </div>
-    </CardBody>
-  </Card>
-);
 
 export default function ParticipantDetailsPage() {
   const navigate = useNavigate();
@@ -325,35 +243,7 @@ export default function ParticipantDetailsPage() {
 
 
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("fr-FR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((word) => word.charAt(0))
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  const downloadResume = () => {
-    if (participant?.talent_id.resume) {
-      const link = document.createElement("a");
-      link.href = `http://localhost:8000${participant.talent_id.resume}`;
-      link.download = `${participant.talent_id.name}_resume.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-  };
 
   if (loading) {
     return (
@@ -418,7 +308,9 @@ export default function ParticipantDetailsPage() {
               <Button
                 variant="light"
                 onPress={handleCancel}
-                startContent={<X size={16} />}
+                startContent={
+                  <CornerDownLeft size={16} className="items-center mt-1" />
+                }
                 isDisabled={!dirty || saving}
               >
                 Reset
@@ -436,74 +328,8 @@ export default function ParticipantDetailsPage() {
           </div>
 
           {/* Participant Header Card */}
-            <Card className="shadow-lg border border-gray-200">
-            <CardBody className="p-6">
-              <div className="flex flex-col md:flex-row items-start gap-6">
-              <Avatar
-                src={participant.talent_id.avatar}
-                name={getInitials(participant.talent_id.name)}
-                size="lg"
-                className="text-lg font-bold flex-shrink-0"
-              />
+          <ParticipantInfoCard participant={participant} />
 
-              <div className="flex-1 w-full">
-                <div className="flex flex-col lg:flex-row justify-between gap-4">
-                {/* Left side: Participant Info */}
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-2xl font-bold text-gray-900 mb-2 truncate">
-                  {participant.talent_id.name}
-                  </h1>
-                  <div className="flex flex-col gap-2 text-sm text-gray-600 mb-4">
-                  <div className="flex items-center gap-2">
-                    <Mail size={14} />
-                    <span>{participant.talent_id.email}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone size={14} />
-                    <span>{participant.talent_id.phone}</span>
-                  </div>
-                  {participant.talent_id.location && (
-                    <div className="flex items-center gap-2">
-                    <MapPin size={14} />
-                    <span>{participant.talent_id.location}</span>
-                    </div>
-                  )}
-                  </div>
-
-                  {participant.talent_id.etablissement && (
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    <Chip size="sm" color="primary">
-                    {participant.talent_id.etablissement}
-                    </Chip>
-                    {participant.talent_id.filiere && (
-                    <Chip size="sm" color="secondary">
-                      {participant.talent_id.filiere}
-                    </Chip>
-                    )}
-                  </div>
-                  )}
-                </div>
-
-                {/* Right side: Info Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4 flex-shrink-0">
-                  <InfoCard
-                  icon={Clock}
-                  title="Interview Time"
-                  value={new Date(participant.rdv).toLocaleString("fr-FR")}
-                  color="secondary"
-                  />
-                  <InfoCard
-                  icon={Calendar}
-                  title="Registration Date"
-                  value={formatDate(participant.date_inscription)}
-                  color="primary"
-                  />
-                </div>
-                </div>
-              </div>
-              </div>
-            </CardBody>
-            </Card>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -548,7 +374,6 @@ export default function ParticipantDetailsPage() {
             }
           >
             <div className="space-y-6">
-
               {/* Evaluation Section */}
               <Card className="shadow-lg border border-gray-200">
                 <CardHeader className="pb-3">
@@ -676,14 +501,6 @@ export default function ParticipantDetailsPage() {
                 </Worker>
               )}
             </ModalBody>
-            <ModalFooter>
-              <Button onPress={onClose} variant="light">
-                Close
-              </Button>
-              <Button onPress={downloadResume} color="primary">
-                Download
-              </Button>
-            </ModalFooter>
           </ModalContent>
         </Modal>
       </div>

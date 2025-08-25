@@ -14,6 +14,7 @@ function App() {
         path="/events/:eventId/participants/:talentId"
         />
 
+
     </Routes>
   );
 }
