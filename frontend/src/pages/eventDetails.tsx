@@ -1,12 +1,14 @@
 import { useParams } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import DefaultLayout from "@/layouts/default";
+import Stats from "@/components/stats";
 import {
   Users,
   Download,
   CircleAlert,
   ChartArea,
   SearchIcon,
+  Mail,
 } from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@heroui/button";
@@ -25,7 +27,17 @@ import {
 import { Input } from "@heroui/input";
 import { Image as HeroImage } from "@heroui/image";
 import { Card, CardBody } from "@heroui/card";
+import {Chip} from "@heroui/chip";
 import { Link } from "react-router-dom";
+import { 
+  Table, 
+  TableHeader, 
+  TableColumn, 
+  TableBody, 
+  TableRow, 
+  TableCell,
+} from "@heroui/table";
+
 
 interface Event {
   id: string | number;
@@ -58,7 +70,7 @@ interface Participations {
   date_inscription: Date;
   note: number;
   comment: string;
-  rdv: string;
+  rdv: Date;
   is_selected: boolean;
 }
 
@@ -77,25 +89,24 @@ export default function EventDetailsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isLoadingParticipations, setIsLoadingParticipations] = useState(false);
+  const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(false);
+  const [isLoadingEmail, setIsLoadingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'selected' | 'not-selected'>('all');
+
 
   const [participations, setParticipations] = useState<Participations[]>([]);
 
-  const [showFileInput, setShowFileInput] = useState(false);
   const [newCv, setNewCv] = useState<File | null>(null);
+
+
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setNewCv(e.target.files[0]);
     }
   };
-  const handleImportConfirm = () => {
-    if (!newCv) {
-      alert("Veuillez sélectionner un fichier CV avant d'importer.");
-      return;
-    }
-    handleCvChange();
-    setShowFileInput(false);
-  };
+
   const {
     isOpen: isCvModalOpen,
     onOpen: onOpenCvModal,
@@ -248,6 +259,44 @@ export default function EventDetailsPage() {
     }
   };
 
+  const sendEmailToSelectedTalents = async () => {
+    if (!id) return;
+
+    const selectedTalents = participations.filter(p => p.is_selected);
+    if (selectedTalents.length === 0) {
+      alert("Aucun talent sélectionné trouvé.");
+      return;
+    }
+
+    setIsLoadingEmail(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/events/${id}/send-selection-email/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          talent_ids: selectedTalents.map(p => p.talent_id.id)
+        }),
+      });
+
+      if (response.ok) {
+        alert(`Email envoyé avec succès à ${selectedTalents.length} talent(s) sélectionné(s)!`);
+        setEmailSent(true); // Hide the button after successful send
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de l'envoi de l'email");
+      }
+    } catch (error) {
+      console.error("Error sending email:", error);
+      alert("Erreur lors de l'envoi de l'email. Veuillez réessayer.");
+    } finally {
+      setIsLoadingEmail(false);
+    }
+  };
+
+
+
   useEffect(() => {
     fetchParticipations(1, ""); // Initial load
   }, [id, user?.id]);
@@ -383,6 +432,8 @@ export default function EventDetailsPage() {
     }
   };
   const confirmKeepCv = async () => {
+    setIsLoadingRegistrations(true);
+
     try {
       const response = await fetch(
         "http://localhost:8000/api/participations/",
@@ -409,11 +460,9 @@ export default function EventDetailsPage() {
         throw new Error(errorMessage);
       }
 
-      const data = await response.json();
-      console.log("Registration successful:", data);
-
       onCloseConfirmModal();
       alert("Inscription réussie avec votre CV actuel !");
+      setIsRegistered(true);
     } catch (error) {
       console.error("Registration error:", error);
 
@@ -423,10 +472,14 @@ export default function EventDetailsPage() {
       } else {
         alert("Erreur lors de l'inscription");
       }
+    } finally {
+      setIsLoadingRegistrations(false);
     }
   };
 
   const handleRegistrationSubmit = async (formData: any) => {
+    setIsLoadingRegistrations(true);
+
     try {
       const form = new FormData();
       form.append("name", formData.name);
@@ -456,7 +509,7 @@ export default function EventDetailsPage() {
         // Handle specific error cases
         const errorData = await response.json();
 
-        if (errorData.error === "No available time slots") {
+        if (errorData.error === "No available RDV slots") {
           alert(
             "Désolé, tous les créneaux horaires sont complets pour cet événement."
           );
@@ -476,10 +529,11 @@ export default function EventDetailsPage() {
       console.error("Registration error:", error);
       alert("Erreur lors de l'inscription");
       onCloseRegistrationModal();
+    } finally {
+      setIsLoadingRegistrations(false);
     }
   };
 
-  console.log("participations:", participations);
   // Function to clean and render HTML content from ReactQuill
   const renderDescription = (htmlContent: string) => {
     if (!htmlContent) return null;
@@ -585,7 +639,82 @@ export default function EventDetailsPage() {
     setSearchQuery(event.target.value);
   };
 
-  const filteredParticipations = participations;
+  // Helper function to format participant names
+  const formatParticipantName = (name: string) => {
+    const nameParts = name.split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts[1];
+    
+    const formattedFirst = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    const formattedLast = lastName ? lastName.charAt(0).toUpperCase() + lastName.slice(1) : "";
+    
+    return `${formattedFirst} ${formattedLast}`.trim();
+  };
+
+  const filteredParticipations = participations.filter((participation) => {
+    // Apply selection filter
+    if (selectedFilter === 'selected' && !participation.is_selected) {
+      return false;
+    }
+    if (selectedFilter === 'not-selected' && participation.is_selected) {
+      return false;
+    }
+    // 'all' filter shows all participants, so no additional filtering needed
+    return true;
+  });
+
+  // Define table columns
+  const columns = [
+    { key: "name", label: "Nom" },
+    { key: "email", label: "Email" },
+    { key: "phone", label: "Téléphone" },
+    { key: "etablissement", label: "Etablissement" },
+    { key: "filiere", label: "Filière" },
+    ...(event?.is_timeSlot_enabled ? [{ key: "rdv", label: "RDV" }] : []),
+    { key: "is_selected", label: "Sélection" },
+  ];
+
+  // Transform participations data for the table
+  const tableData = filteredParticipations.map((p) => ({
+    id: p.id.toString(),
+    name: formatParticipantName(p.talent_id.name),
+    email: p.talent_id.email,
+    phone: p.talent_id.phone,
+    etablissement: p.talent_id.etablissement || "—",
+    filiere: p.talent_id.filiere || "—",
+    rdv: p.rdv ? new Date(p.rdv).toLocaleString("fr-FR") : "—",
+    is_selected: p.is_selected,
+    talent_id: p.talent_id.id,
+  }));
+
+  const renderCell = (item: any, columnKey: React.Key) => {
+    switch (columnKey) {
+      case "name":
+        return (
+          <Link
+            to={`participants/${item.talent_id}`}
+
+          >
+            {item.name}
+          </Link>
+        );
+      case "filiere":
+        return (
+          <span className="max-w-xs truncate" title={item.filiere}>
+            {item.filiere}
+          </span>
+        );
+      case "is_selected":
+        return (
+
+            <Chip color={`${item.is_selected ? "success" : "danger"}`} variant="flat">
+            {item.is_selected ? "Sélectionné" : "Non sélectionné"}
+            </Chip>
+        );
+      default:
+        return item[columnKey as keyof typeof item];
+    }
+  };
 
   // Loading state
   if (isLoading) {
@@ -825,24 +954,85 @@ export default function EventDetailsPage() {
                             Liste des participants
                           </h2>
 
-                          <div className="mb-4 flex justify-between items-center">
-                            <Input
-                              type="search"
-                              placeholder="Rechercher un participant..."
-                              className="max-w-xs"
-                              size="sm"
-                              startContent={<SearchIcon color="gray" />}
-                              value={searchQuery}
-                              onChange={handleInputChange}
-                            />
-                            <div className="text-sm text-gray-600">
-                              {totalCount > 0 && (
-                                <span>
-                                  {totalCount} participant
-                                  {totalCount > 1 ? "s" : ""} trouvé
-                                  {totalCount > 1 ? "s" : ""}
-                                  {searchQuery && ` pour "${searchQuery}"`}
-                                </span>
+                          <div className="mb-4 space-y-4">
+                            <div className="flex justify-between items-center">
+                              <Input
+                                type="search"
+                                placeholder="Rechercher un participant..."
+                                className="max-w-xs"
+                                size="sm"
+                                startContent={<SearchIcon color="gray" />}
+                                value={searchQuery}
+                                onChange={handleInputChange}
+                              />
+                              <div className="text-sm text-gray-600">
+                                {filteredParticipations.length > 0 && (
+                                  <span>
+                                    {filteredParticipations.length} participant
+                                    {filteredParticipations.length > 1 ? "s" : ""} affiché
+                                    {filteredParticipations.length > 1 ? "s" : ""}
+                                    {searchQuery && ` pour "${searchQuery}"`}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Selection Filter */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <span className="text-sm font-medium text-gray-700">Filtrer par sélection:</span>
+                                <div className="flex space-x-2">
+                                  <Button
+                                    size="sm"
+                                    variant={selectedFilter === 'all' ? 'solid' : 'bordered'}
+                                    color={selectedFilter === 'all' ? 'primary' : 'default'}
+                                    onClick={() => {
+                                      setSelectedFilter('all');
+                                      setEmailSent(false);
+                                    }}
+                                  >
+                                    Tous ({participations.length})
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={selectedFilter === 'selected' ? 'solid' : 'bordered'}
+                                    color={selectedFilter === 'selected' ? 'success' : 'default'}
+                                    onClick={() => {
+                                      setSelectedFilter('selected');
+                                      setEmailSent(false);
+                                    }}
+                                  >
+                                    Sélectionnés ({participations.filter(p => p.is_selected).length})
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={selectedFilter === 'not-selected' ? 'solid' : 'bordered'}
+                                    color={selectedFilter === 'not-selected' ? 'warning' : 'default'}
+                                    onClick={() => {
+                                      setSelectedFilter('not-selected');
+                                      setEmailSent(false);
+                                    }}
+                                  >
+                                    Non sélectionnés ({participations.filter(p => !p.is_selected).length})
+                                  </Button>
+                                </div>
+                              </div>
+                              
+                              {/* Email Button - Only show when "selected" filter is active and email not sent yet */}
+                              {selectedFilter === 'selected' && 
+                               !emailSent && 
+                               participations.filter(p => p.is_selected).length > 0 && (
+                                <Button
+                                  size="sm"
+                                  color="primary"
+                                  variant="solid"
+                                  startContent={<Mail size={16} />}
+                                  isLoading={isLoadingEmail}
+                                  onPress={sendEmailToSelectedTalents}
+                                  className="bg-blue-600 hover:bg-blue-700"
+                                >
+                                  {isLoadingEmail ? "Envoi..." : "Envoyer email"}
+                                </Button>
                               )}
                             </div>
                           </div>
@@ -853,121 +1043,50 @@ export default function EventDetailsPage() {
                             </div>
                           ) : (
                             <>
-                              <div className="overflow-x-auto">
-                                <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                                  <thead className="bg-gray-50">
-                                    <tr>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                        Nom
-                                      </th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                        Email
-                                      </th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                        Téléphone
-                                      </th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                        Etablissement
-                                      </th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                        Filière
-                                      </th>
-                                      {event.is_timeSlot_enabled && (
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                          RDV
-                                        </th>
+                              <Table
+                                aria-label="Participants table"
+                                
+                                
+                              >
+                                <TableHeader columns={columns}>
+                                  {(column) => (
+                                    <TableColumn key={column.key}>
+                                      {column.label}
+                                    </TableColumn>
+                                  )}
+                                </TableHeader>
+                                <TableBody 
+                                  items={tableData}
+                                  emptyContent={
+                                    <div className="flex flex-col items-center justify-center py-12">
+                                      <div className="text-gray-400 text-4xl mb-2">👥</div>
+                                      <p className="text-gray-500 text-sm">
+                                        {searchQuery
+                                          ? `Aucun participant trouvé pour "${searchQuery}"`
+                                          : "Aucun participant trouvé pour cet événement"}
+                                      </p>
+                                      {searchQuery && (
+                                        <Button
+                                          variant="light"
+                                          size="sm"
+                                          className="mt-2"
+                                          onPress={() => setSearchQuery("")}
+                                        >
+                                          Effacer la recherche
+                                        </Button>
                                       )}
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                                        Sélection
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="bg-white divide-y divide-gray-200">
-                                    {Array.isArray(filteredParticipations) &&
-                                    filteredParticipations.length > 0 ? (
-                                      filteredParticipations.map((p) => (
-                                        <tr
-                                          key={p.id}
-                                          className="hover:bg-gray-50 transition-colors"
-                                        >
-                                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            <Link
-                                              to={`participants/${p.talent_id.id}`}
-                                            >
-                                              {p.talent_id.name}
-                                            </Link>
-                                          </td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {p.talent_id.email}
-                                          </td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {p.talent_id.phone}
-                                          </td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {p.talent_id.etablissement || "—"}
-                                          </td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <span
-                                              className="max-w-xs truncate"
-                                              title={p.talent_id.filiere || "—"}
-                                            >
-                                              {p.talent_id.filiere || "—"}
-                                            </span>
-                                          </td>
-                                          {event.is_timeSlot_enabled && (
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                              {p.rdv || "—"}
-                                            </td>
-                                          )}
-                                          <td className="px-6 py-4 whitespace-nowrap">
-                                            <span
-                                              className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                                                p.is_selected
-                                                  ? "bg-green-100 text-green-800 border border-green-200"
-                                                  : "bg-red-100 text-red-800 border border-red-200"
-                                              }`}
-                                            >
-                                              {p.is_selected
-                                                ? "✅ Sélectionné"
-                                                : "❌ Non sélectionné"}
-                                            </span>
-                                          </td>
-                                        </tr>
-                                      ))
-                                    ) : (
-                                      <tr>
-                                        <td
-                                          colSpan={
-                                            event.is_timeSlot_enabled ? 7 : 6
-                                          }
-                                          className="px-6 py-12 text-center"
-                                        >
-                                          <div className="flex flex-col items-center justify-center">
-                                            <div className="text-gray-400 text-4xl mb-2">
-                                              👥
-                                            </div>
-                                            <p className="text-gray-500 text-sm">
-                                              {searchQuery
-                                                ? `Aucun participant trouvé pour "${searchQuery}"`
-                                                : "Aucun participant trouvé pour cet événement"}
-                                            </p>
-                                            {searchQuery && (
-                                              <button
-                                                onClick={() =>
-                                                  setSearchQuery("")
-                                                }
-                                                className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
-                                              >
-                                                Effacer la recherche
-                                              </button>
-                                            )}
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
+                                    </div>
+                                  }
+                                >
+                                  {(item) => (
+                                    <TableRow key={item.id}>
+                                      {(columnKey) => (
+                                        <TableCell>{renderCell(item, columnKey)}</TableCell>
+                                      )}
+                                    </TableRow>
+                                  )}
+                                </TableBody>
+                              </Table>
 
                               {/* Pagination Controls */}
                               {totalPages > 1 && (
@@ -1055,7 +1174,9 @@ export default function EventDetailsPage() {
                         </div>
                       }
                     >
-                      Statistiques
+                      <div className="mt-6">
+                        <Stats eventId={parseInt(id!)} />
+                      </div>
                     </Tab>
                   </Tabs>
                 </>
@@ -1262,8 +1383,12 @@ export default function EventDetailsPage() {
                     />
                   </div>
 
-                  <Button type="submit" color="primary">
-                    Soumettre
+                  <Button
+                    type="submit"
+                    color="primary"
+                    disabled={isLoadingRegistrations}
+                  >
+                    {isLoadingRegistrations ? "En cours..." : "Soumettre"}
                   </Button>
                 </form>
               </ModalBody>
@@ -1288,11 +1413,17 @@ export default function EventDetailsPage() {
                 color="danger"
                 variant="light"
                 onPress={onCloseConfirmModal}
+                isDisabled={isLoadingRegistrations}
               >
                 Annuler
               </Button>
-              <Button color="primary" onPress={confirmKeepCv}>
-                Confirmer
+              <Button
+                color="primary"
+                onPress={confirmKeepCv}
+                isLoading={isLoadingRegistrations}
+                isDisabled={isLoadingRegistrations}
+              >
+                {isLoadingRegistrations ? "En cours..." : "Confirmer"}
               </Button>
             </ModalFooter>
           </ModalContent>

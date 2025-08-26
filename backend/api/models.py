@@ -35,7 +35,7 @@ class Participation(models.Model):
     note = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(5)])
     comment = models.TextField(default="",null=True, blank=True)
     is_selected = models.BooleanField(default=False)
-    rdv = models.TimeField(null=True, blank=True)
+    rdv = models.DateTimeField(null=True, blank=True)
     event_time_slot = models.ForeignKey('TimeSlot', on_delete=models.CASCADE, null=True, blank=True)
 
     class Meta:
