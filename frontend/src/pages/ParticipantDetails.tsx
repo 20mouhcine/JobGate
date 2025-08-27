@@ -98,18 +98,16 @@ const StarRating = ({
             onClick={() => editable && onRatingChange?.(star)}
             onMouseEnter={() => editable && setHoverRating(star)}
             onMouseLeave={() => editable && setHoverRating(0)}
-            className={`transition-all duration-200 ${
-              editable ? "hover:scale-110 cursor-pointer" : "cursor-default"
-            }`}
+            className={`transition-all duration-200 ${editable ? "hover:scale-110 cursor-pointer" : "cursor-default"
+              }`}
             disabled={!editable}
           >
             <Star
               size={size}
-              className={`${
-                star <= (hoverRating || rating)
+              className={`${star <= (hoverRating || rating)
                   ? "text-yellow-400 fill-yellow-400"
                   : "text-gray-300"
-              } transition-colors duration-200`}
+                } transition-colors duration-200`}
             />
           </button>
         ))}
@@ -491,7 +489,7 @@ export default function ParticipantDetailsPage() {
             </ModalHeader>
             <ModalBody className="p-0">
               {participant.talent_id.resume && (
-                <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js">
+                <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
                   <div className="h-[70vh] border border-gray-300">
                     <Viewer
                       plugins={[defaultLayoutPluginInstance]}

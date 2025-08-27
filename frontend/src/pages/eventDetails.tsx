@@ -27,14 +27,14 @@ import {
 import { Input } from "@heroui/input";
 import { Image as HeroImage } from "@heroui/image";
 import { Card, CardBody } from "@heroui/card";
-import {Chip} from "@heroui/chip";
+import { Chip } from "@heroui/chip";
 import { Link } from "react-router-dom";
-import { 
-  Table, 
-  TableHeader, 
-  TableColumn, 
-  TableBody, 
-  TableRow, 
+import {
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
   TableCell,
 } from "@heroui/table";
 
@@ -50,6 +50,7 @@ interface Event {
   description: string;
   is_timeSlot_enabled: boolean;
   is_online: boolean;
+  is_archived: boolean;
 }
 
 interface Talent {
@@ -95,6 +96,8 @@ export default function EventDetailsPage() {
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'selected' | 'not-selected'>('all');
 
 
+
+
   const [participations, setParticipations] = useState<Participations[]>([]);
 
   const [newCv, setNewCv] = useState<File | null>(null);
@@ -119,6 +122,16 @@ export default function EventDetailsPage() {
     onOpen: onOpenRegistrationModal,
     onOpenChange: onOpenChangeRegistrationModal,
     onClose: onCloseRegistrationModal,
+  } = useDisclosure();
+
+  const { isOpen: isArchiveOpen,
+    onOpen: onArchiveOpen,
+    onOpenChange: onArchiveOpenChange
+  } = useDisclosure();
+
+  const { isOpen: isUnarchiveOpen,
+    onOpen: onUnarchiveOpen,
+    onOpenChange: onUnarchiveOpenChange
   } = useDisclosure();
   const {
     isOpen: isConfirmModalOpen,
@@ -310,6 +323,35 @@ export default function EventDetailsPage() {
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
+
+const DesarchiverEvenement = async () => {
+  try {
+    if (!event) return;
+
+    const response = await fetch(
+      `http://localhost:8000/api/events/${event.id}/`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ is_archived: false }),
+      }
+    );
+
+    if (!response.ok) throw new Error("Failed to unarchive the event");
+
+    setEvent((prev) => ({ ...prev, is_archived: false }));
+    onUnarchiveOpenChange(false);
+    //fetchEvents();
+    window.location.href = "/events";
+
+  } catch (error) {
+    console.error(error);
+    alert("Erreur lors du désarchivage de l'événement.");
+  }
+};
+
   // Handle page changes
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
@@ -348,6 +390,7 @@ export default function EventDetailsPage() {
 
     fetchEvent();
   }, [id]);
+
 
   useEffect(() => {
     const checkRegistrationStatus = async () => {
@@ -519,7 +562,7 @@ export default function EventDetailsPage() {
         } else {
           alert(
             "Erreur lors de l'inscription: " +
-              (errorData.error || "Erreur inconnue")
+            (errorData.error || "Erreur inconnue")
           );
         }
 
@@ -635,6 +678,29 @@ export default function EventDetailsPage() {
       setError("Failed to cancel the event. Please try again later.");
     }
   };
+
+  const ArchiverEvenement = async () => {
+    try {
+      const response = await fetch(`${apiUrl}${id}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ is_archived: true }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      window.location.href = "/events";
+    } catch (error) {
+      console.error("Error archiving event:", error);
+      setError("Failed to archive the event. Please try again later.");
+    }
+  };
+
+
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
   };
@@ -644,10 +710,10 @@ export default function EventDetailsPage() {
     const nameParts = name.split(" ");
     const firstName = nameParts[0];
     const lastName = nameParts[1];
-    
+
     const formattedFirst = firstName.charAt(0).toUpperCase() + firstName.slice(1);
     const formattedLast = lastName ? lastName.charAt(0).toUpperCase() + lastName.slice(1) : "";
-    
+
     return `${formattedFirst} ${formattedLast}`.trim();
   };
 
@@ -707,9 +773,9 @@ export default function EventDetailsPage() {
       case "is_selected":
         return (
 
-            <Chip color={`${item.is_selected ? "success" : "danger"}`} variant="flat">
+          <Chip color={`${item.is_selected ? "success" : "danger"}`} variant="flat">
             {item.is_selected ? "Sélectionné" : "Non sélectionné"}
-            </Chip>
+          </Chip>
         );
       default:
         return item[columnKey as keyof typeof item];
@@ -769,6 +835,9 @@ export default function EventDetailsPage() {
       </DefaultLayout>
     );
   }
+  const endDate = event.end_date ? new Date(event.end_date) : null;
+  const now = new Date();
+  const isEventFinished = endDate ? endDate < now : false;
 
   // Format date for display
   const formatDate = (dateString: string) => {
@@ -880,17 +949,30 @@ export default function EventDetailsPage() {
                             <div className="mt-6">
                               {user?.role === "recruiter" ? (
                                 <>
-                                  <Button
-                                    onPress={onOpen}
-                                    color="danger"
-                                    variant="flat"
-                                  >
-                                    Annuler l'événement
-                                  </Button>
-                                  <Modal
-                                    isOpen={isOpen}
-                                    onOpenChange={onOpenChange}
-                                  >
+                                  {!event.is_archived ? (
+                                    // ✅ Event is active
+                                    <div className="flex gap-2">
+                                      <Button onPress={onOpen} color="danger" variant="flat">
+                                        Annuler l'événement
+                                      </Button>
+                                        
+                                      <Button onPress={onArchiveOpen} color="primary" variant="flat">
+                                        Archiver l'événement
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    // ✅ Event is archived
+                                    <div className="flex gap-2">
+                                      {!isEventFinished && (
+                                        <Button onPress={onUnarchiveOpen} color="secondary" variant="flat">
+                                          Désarchiver l'événement
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Modal d’annulation */}
+                                  <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
                                     <ModalContent>
                                       {(onClose) => (
                                         <>
@@ -898,24 +980,60 @@ export default function EventDetailsPage() {
                                             Confirmer l'annulation
                                           </ModalHeader>
                                           <ModalBody>
-                                            Êtes-vous sûr de vouloir annuler cet
-                                            événement ? Cette action est
-                                            irréversible.
+                                            Êtes-vous sûr de vouloir annuler cet événement ?
+                                            Cette action est irréversible.
                                           </ModalBody>
                                           <ModalFooter>
-                                            <Button
-                                              color="danger"
-                                              variant="light"
-                                              onPress={onClose}
-                                            >
+                                            <Button color="danger" variant="light" onPress={onClose}>
                                               Non
                                             </Button>
-                                            <Button
-                                              color="primary"
-                                              onPress={AnnulerEvenement}
-                                              variant="flat"
-                                            >
+                                            <Button color="primary" onPress={AnnulerEvenement} variant="flat">
                                               Oui
+                                            </Button>
+                                          </ModalFooter>
+                                        </>
+                                      )}
+                                    </ModalContent>
+                                  </Modal>
+
+                                  {/* Modal d’archivage */}
+                                  <Modal isOpen={isArchiveOpen} onOpenChange={onArchiveOpenChange}>
+                                    <ModalContent>
+                                      {(onClose) => (
+                                        <>
+                                          <ModalHeader>Confirmer l’archivage</ModalHeader>
+                                          <ModalBody>
+                                            Êtes-vous sûr de vouloir archiver cet événement ?
+                                            Vous pourrez le retrouver plus tard dans la liste des événements archivés.
+                                          </ModalBody>
+                                          <ModalFooter>
+                                            <Button color="danger" variant="light" onPress={onClose}>
+                                              Non
+                                            </Button>
+                                            <Button color="primary" variant="flat" onPress={ArchiverEvenement}>
+                                              Oui, archiver
+                                            </Button>
+                                          </ModalFooter>
+                                        </>
+                                      )}
+                                    </ModalContent>
+                                  </Modal>
+
+                                  {/* Modal de désarchivage */}
+                                  <Modal isOpen={isUnarchiveOpen} onOpenChange={onUnarchiveOpenChange}>
+                                    <ModalContent>
+                                      {(onClose) => (
+                                        <>
+                                          <ModalHeader>Confirmer le désarchivage</ModalHeader>
+                                          <ModalBody>
+                                            Voulez-vous restaurer cet événement actif ?
+                                          </ModalBody>
+                                          <ModalFooter>
+                                            <Button color="danger" variant="light" onPress={onClose}>
+                                              Non
+                                            </Button>
+                                            <Button color="primary" variant="flat" onPress={DesarchiverEvenement}>
+                                              Oui, restaurer
                                             </Button>
                                           </ModalFooter>
                                         </>
@@ -924,11 +1042,12 @@ export default function EventDetailsPage() {
                                   </Modal>
                                 </>
                               ) : (
+                                // ✅ Talents
                                 <Button
                                   className="mt-4"
                                   color="primary"
                                   variant="flat"
-                                  isDisabled={isRegistered}
+                                  isDisabled={isRegistered || event.is_archived}
                                   onPress={handleRegistrationClick}
                                 >
                                   {isRegistered ? "Déjà inscrit" : "S'inscrire"}
@@ -976,7 +1095,7 @@ export default function EventDetailsPage() {
                                 )}
                               </div>
                             </div>
-                            
+
                             {/* Selection Filter */}
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-3">
@@ -1017,23 +1136,23 @@ export default function EventDetailsPage() {
                                   </Button>
                                 </div>
                               </div>
-                              
+
                               {/* Email Button - Only show when "selected" filter is active and email not sent yet */}
-                              {selectedFilter === 'selected' && 
-                               !emailSent && 
-                               participations.filter(p => p.is_selected).length > 0 && (
-                                <Button
-                                  size="sm"
-                                  color="primary"
-                                  variant="solid"
-                                  startContent={<Mail size={16} />}
-                                  isLoading={isLoadingEmail}
-                                  onPress={sendEmailToSelectedTalents}
-                                  className="bg-blue-600 hover:bg-blue-700"
-                                >
-                                  {isLoadingEmail ? "Envoi..." : "Envoyer email"}
-                                </Button>
-                              )}
+                              {selectedFilter === 'selected' &&
+                                !emailSent &&
+                                participations.filter(p => p.is_selected).length > 0 && (
+                                  <Button
+                                    size="sm"
+                                    color="primary"
+                                    variant="solid"
+                                    startContent={<Mail size={16} />}
+                                    isLoading={isLoadingEmail}
+                                    onPress={sendEmailToSelectedTalents}
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                  >
+                                    {isLoadingEmail ? "Envoi..." : "Envoyer email"}
+                                  </Button>
+                                )}
                             </div>
                           </div>
 
@@ -1045,8 +1164,8 @@ export default function EventDetailsPage() {
                             <>
                               <Table
                                 aria-label="Participants table"
-                                
-                                
+
+
                               >
                                 <TableHeader columns={columns}>
                                   {(column) => (
@@ -1055,7 +1174,7 @@ export default function EventDetailsPage() {
                                     </TableColumn>
                                   )}
                                 </TableHeader>
-                                <TableBody 
+                                <TableBody
                                   items={tableData}
                                   emptyContent={
                                     <div className="flex flex-col items-center justify-center py-12">
