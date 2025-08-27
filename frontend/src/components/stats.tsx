@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import toast from "react-hot-toast";
 import {
   Users,
@@ -6,6 +6,7 @@ import {
   ChartArea,
   Star,
   Trophy,
+  Download,
 } from "lucide-react";
 import {
   BarChart,
@@ -19,11 +20,18 @@ import {
   PieChart,
   Pie,
   Cell,
+  LineChart,
+  Line,
 } from "recharts";
+import { generateStatsPDF} from "../utils/pdfGenerator";
 
 const Stats = ({ eventId }: { eventId: number }) => {
   const [statsData, setStatsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [eventInfo, setEventInfo] = useState<any>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
 
   // Chart colors (matching eventDetails.tsx)
   const COLORS = {
@@ -59,19 +67,29 @@ const Stats = ({ eventId }: { eventId: number }) => {
     const fetchEventStatistics = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:8000/api/events/${eventId}/statistics/`);
         
-        if (!response.ok) {
-          throw new Error('Failed to fetch event statistics');
+        // Fetch event info and statistics in parallel
+        const [eventResponse, statsResponse] = await Promise.all([
+          fetch(`http://localhost:8000/api/events/${eventId}/`),
+          fetch(`http://localhost:8000/api/events/${eventId}/statistics/`)
+        ]);
+        
+        if (!eventResponse.ok || !statsResponse.ok) {
+          throw new Error('Failed to fetch event data');
         }
         
-        const data = await response.json();
-        console.log("Event statistics data:", data); // Debug log
-        setStatsData(data);
+        const eventData = await eventResponse.json();
+        const statsData = await statsResponse.json();
+        
+        console.log("Event data:", eventData);
+        console.log("Event statistics data:", statsData);
+        
+        setEventInfo(eventData);
+        setStatsData(statsData);
         
       } catch (error) {
-        console.error("Error fetching event statistics:", error);
-        toast.error("Failed to load event statistics");
+        console.error("Error fetching event data:", error);
+        toast.error("Failed to load event data");
         // Set fallback data to prevent empty state
         setStatsData({
           overview: {
@@ -96,6 +114,27 @@ const Stats = ({ eventId }: { eventId: number }) => {
       fetchEventStatistics();
     }
   }, [eventId]);
+
+  // Download functions
+  const handleDownloadStatsPDF = async () => {
+    if (!statsData || !eventInfo) {
+      toast.error("Données non disponibles pour le téléchargement");
+      return;
+    }
+
+    try {
+      setIsDownloading(true);
+      await generateStatsPDF(stats, eventInfo, statsData);
+      toast.success("Rapport PDF téléchargé avec succès!");
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      toast.error("Erreur lors du téléchargement du PDF");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+ 
 
   // Prepare data from API response
   const stats = statsData ? {
@@ -203,6 +242,70 @@ const Stats = ({ eventId }: { eventId: number }) => {
     return data;
   };
 
+  // Prepare historical comparison chart data
+  const prepareHistoricalTrendData = () => {
+    if (!statsData?.historical_comparison?.previous_events_data) return [];
+    
+    const historicalData = [...statsData.historical_comparison.previous_events_data]
+      .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
+      .map((event: any) => ({
+        name: new Date(event.event_date).toLocaleDateString('fr-FR', { 
+          month: 'short', 
+          day: 'numeric' 
+        }),
+        fullName: event.event_title,
+        participants: event.total_participants,
+        attendance_rate: event.attendance_rate,
+        selection_rate: event.selection_rate,
+        average_rating: event.average_rating,
+        date: event.event_date
+      }));
+
+    // Add current event data
+    const currentEventData = {
+      name: 'Actuel',
+      fullName: statsData.event_info?.title || 'Événement actuel',
+      participants: stats.totalTalents,
+      attendance_rate: stats.attendanceRate,
+      selection_rate: stats.selectionRate,
+      average_rating: stats.averageRating,
+      date: statsData.event_info?.start_date
+    };
+
+    return [...historicalData, currentEventData];
+  };
+
+  const prepareParticipantsEvolutionData = () => {
+    const data = prepareHistoricalTrendData();
+    return data.map(item => ({
+      name: item.name,
+      fullName: item.fullName,
+      participants: item.participants,
+      date: item.date
+    }));
+  };
+
+  const prepareRatesEvolutionData = () => {
+    const data = prepareHistoricalTrendData();
+    return data.map(item => ({
+      name: item.name,
+      fullName: item.fullName,
+      'Taux de présence': item.attendance_rate,
+      'Taux de sélection': item.selection_rate,
+      date: item.date
+    }));
+  };
+
+  const prepareRatingEvolutionData = () => {
+    const data = prepareHistoricalTrendData();
+    return data.map(item => ({
+      name: item.name,
+      fullName: item.fullName,
+      'Note moyenne': item.average_rating,
+      date: item.date
+    }));
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
@@ -235,8 +338,24 @@ const Stats = ({ eventId }: { eventId: number }) => {
         <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-gray-800">Vue d'ensemble des KPIs de l'événement</h3>
-            <div className="bg-blue-100 p-2 rounded-lg">
-              <ChartArea className="w-5 h-5 text-blue-600" />
+            <div className="flex items-center space-x-3">
+              {/* Download Dropdown */}
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={handleDownloadStatsPDF}
+                  disabled={isDownloading || !statsData}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Télécharger</span>
+                </button>
+                
+                
+              </div>
+
+              <div className="bg-blue-100 p-2 rounded-lg">
+                <ChartArea className="w-5 h-5 text-blue-600" />
+              </div>
             </div>
           </div>
           
@@ -432,9 +551,9 @@ const Stats = ({ eventId }: { eventId: number }) => {
         </div>
 
         {/* Charts */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div id="stats-charts-container" className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Attendance Rate */}
-          <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="attendance">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800">Taux de Présence</h3>
               <div className="bg-green-100 p-2 rounded-lg">
@@ -483,7 +602,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
           </div>
 
           {/* Top Institutions */}
-          <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="establishments">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800">Établissements les Plus Représentés</h3>
               <div className="bg-blue-100 p-2 rounded-lg">
@@ -531,7 +650,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
         {/* Selection and Conversion Charts */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Selection Rate Chart */}
-          <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="selection">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800">Taux de Sélection</h3>
               <div className="bg-emerald-100 p-2 rounded-lg">
@@ -581,7 +700,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
 
           {/* Filières Chart */}
           {stats.filieres.length > 0 && (
-            <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="filieres">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-gray-800">Filières les Plus Représentées</h3>
                 <div className="bg-purple-100 p-2 rounded-lg">
@@ -628,7 +747,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
         </div>
 
         {/* Conversion Funnel */}
-        <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="funnel">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-gray-800">Entonnoir de Conversion</h3>
             <div className="bg-indigo-100 p-2 rounded-lg">
@@ -697,6 +816,479 @@ const Stats = ({ eventId }: { eventId: number }) => {
             </div>
           </div>
         </div>
+
+        {/* Historical Comparison Section */}
+        {statsData?.historical_comparison && (
+          <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-800">Comparaison avec les événements précédents</h3>
+              <div className="bg-purple-100 p-2 rounded-lg">
+                <ChartArea className="w-5 h-5 text-purple-600" />
+              </div>
+            </div>
+
+            {/* Comparison Metrics Grid */}
+            {statsData.historical_comparison.comparison_metrics && Object.keys(statsData.historical_comparison.comparison_metrics).length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                {/* Participants Change */}
+                <div className={`p-4 rounded-lg border ${
+                  statsData.historical_comparison.performance_indicators.participants_trend === 'increase' 
+                    ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200' 
+                    : statsData.historical_comparison.performance_indicators.participants_trend === 'decrease'
+                    ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'
+                    : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className={`text-xs font-semibold uppercase tracking-wide ${
+                        statsData.historical_comparison.performance_indicators.participants_trend === 'increase' 
+                          ? 'text-green-600' 
+                          : statsData.historical_comparison.performance_indicators.participants_trend === 'decrease'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
+                        Évolution Participants
+                      </div>
+                      <div className={`text-2xl font-bold mt-1 ${
+                        statsData.historical_comparison.performance_indicators.participants_trend === 'increase' 
+                          ? 'text-green-700' 
+                          : statsData.historical_comparison.performance_indicators.participants_trend === 'decrease'
+                          ? 'text-red-700'
+                          : 'text-gray-700'
+                      }`}>
+                        {statsData.historical_comparison.comparison_metrics.participants_change > 0 ? '+' : ''}
+                        {statsData.historical_comparison.comparison_metrics.participants_change?.toFixed(1)}%
+                      </div>
+                      <div className={`text-xs mt-1 ${
+                        statsData.historical_comparison.performance_indicators.participants_trend === 'increase' 
+                          ? 'text-green-600' 
+                          : statsData.historical_comparison.performance_indicators.participants_trend === 'decrease'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
+                        vs moyenne précédente
+                      </div>
+                    </div>
+                    <div className={`p-2 rounded-full ${
+                      statsData.historical_comparison.performance_indicators.participants_trend === 'increase' 
+                        ? 'bg-green-500' 
+                        : statsData.historical_comparison.performance_indicators.participants_trend === 'decrease'
+                        ? 'bg-red-500'
+                        : 'bg-gray-500'
+                    }`}>
+                      <Users className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Attendance Rate Change */}
+                <div className={`p-4 rounded-lg border ${
+                  statsData.historical_comparison.performance_indicators.attendance_trend === 'increase' 
+                    ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200' 
+                    : statsData.historical_comparison.performance_indicators.attendance_trend === 'decrease'
+                    ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'
+                    : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className={`text-xs font-semibold uppercase tracking-wide ${
+                        statsData.historical_comparison.performance_indicators.attendance_trend === 'increase' 
+                          ? 'text-green-600' 
+                          : statsData.historical_comparison.performance_indicators.attendance_trend === 'decrease'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
+                        Évolution Présence
+                      </div>
+                      <div className={`text-2xl font-bold mt-1 ${
+                        statsData.historical_comparison.performance_indicators.attendance_trend === 'increase' 
+                          ? 'text-green-700' 
+                          : statsData.historical_comparison.performance_indicators.attendance_trend === 'decrease'
+                          ? 'text-red-700'
+                          : 'text-gray-700'
+                      }`}>
+                        {statsData.historical_comparison.comparison_metrics.attendance_change > 0 ? '+' : ''}
+                        {statsData.historical_comparison.comparison_metrics.attendance_change?.toFixed(1)}%
+                      </div>
+                      <div className={`text-xs mt-1 ${
+                        statsData.historical_comparison.performance_indicators.attendance_trend === 'increase' 
+                          ? 'text-green-600' 
+                          : statsData.historical_comparison.performance_indicators.attendance_trend === 'decrease'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
+                        vs moyenne précédente
+                      </div>
+                    </div>
+                    <div className={`p-2 rounded-full ${
+                      statsData.historical_comparison.performance_indicators.attendance_trend === 'increase' 
+                        ? 'bg-green-500' 
+                        : statsData.historical_comparison.performance_indicators.attendance_trend === 'decrease'
+                        ? 'bg-red-500'
+                        : 'bg-gray-500'
+                    }`}>
+                      <CircleAlert className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selection Rate Change */}
+                <div className={`p-4 rounded-lg border ${
+                  statsData.historical_comparison.performance_indicators.selection_trend === 'increase' 
+                    ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200' 
+                    : statsData.historical_comparison.performance_indicators.selection_trend === 'decrease'
+                    ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'
+                    : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className={`text-xs font-semibold uppercase tracking-wide ${
+                        statsData.historical_comparison.performance_indicators.selection_trend === 'increase' 
+                          ? 'text-green-600' 
+                          : statsData.historical_comparison.performance_indicators.selection_trend === 'decrease'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
+                        Évolution Sélection
+                      </div>
+                      <div className={`text-2xl font-bold mt-1 ${
+                        statsData.historical_comparison.performance_indicators.selection_trend === 'increase' 
+                          ? 'text-green-700' 
+                          : statsData.historical_comparison.performance_indicators.selection_trend === 'decrease'
+                          ? 'text-red-700'
+                          : 'text-gray-700'
+                      }`}>
+                        {statsData.historical_comparison.comparison_metrics.selection_change > 0 ? '+' : ''}
+                        {statsData.historical_comparison.comparison_metrics.selection_change?.toFixed(1)}%
+                      </div>
+                      <div className={`text-xs mt-1 ${
+                        statsData.historical_comparison.performance_indicators.selection_trend === 'increase' 
+                          ? 'text-green-600' 
+                          : statsData.historical_comparison.performance_indicators.selection_trend === 'decrease'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
+                        vs moyenne précédente
+                      </div>
+                    </div>
+                    <div className={`p-2 rounded-full ${
+                      statsData.historical_comparison.performance_indicators.selection_trend === 'increase' 
+                        ? 'bg-green-500' 
+                        : statsData.historical_comparison.performance_indicators.selection_trend === 'decrease'
+                        ? 'bg-red-500'
+                        : 'bg-gray-500'
+                    }`}>
+                      <Trophy className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Rating Change */}
+                <div className={`p-4 rounded-lg border ${
+                  statsData.historical_comparison.performance_indicators.rating_trend === 'increase' 
+                    ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200' 
+                    : statsData.historical_comparison.performance_indicators.rating_trend === 'decrease'
+                    ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'
+                    : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className={`text-xs font-semibold uppercase tracking-wide ${
+                        statsData.historical_comparison.performance_indicators.rating_trend === 'increase' 
+                          ? 'text-green-600' 
+                          : statsData.historical_comparison.performance_indicators.rating_trend === 'decrease'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
+                        Évolution Notes
+                      </div>
+                      <div className={`text-2xl font-bold mt-1 ${
+                        statsData.historical_comparison.performance_indicators.rating_trend === 'increase' 
+                          ? 'text-green-700' 
+                          : statsData.historical_comparison.performance_indicators.rating_trend === 'decrease'
+                          ? 'text-red-700'
+                          : 'text-gray-700'
+                      }`}>
+                        {statsData.historical_comparison.comparison_metrics.rating_change > 0 ? '+' : ''}
+                        {statsData.historical_comparison.comparison_metrics.rating_change?.toFixed(1)}
+                      </div>
+                      <div className={`text-xs mt-1 ${
+                        statsData.historical_comparison.performance_indicators.rating_trend === 'increase' 
+                          ? 'text-green-600' 
+                          : statsData.historical_comparison.performance_indicators.rating_trend === 'decrease'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
+                        vs moyenne précédente
+                      </div>
+                    </div>
+                    <div className={`p-2 rounded-full ${
+                      statsData.historical_comparison.performance_indicators.rating_trend === 'increase' 
+                        ? 'bg-green-500' 
+                        : statsData.historical_comparison.performance_indicators.rating_trend === 'decrease'
+                        ? 'bg-red-500'
+                        : 'bg-gray-500'
+                    }`}>
+                      <Star className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Historical Trend Charts */}
+            {statsData.historical_comparison.previous_events_data && statsData.historical_comparison.previous_events_data.length > 0 && (
+              <div className="mt-6 space-y-6">
+                <h4 className="text-lg font-semibold text-gray-700 mb-4">Évolution des métriques dans le temps</h4>
+                
+                {/* Participants Evolution Chart */}
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h5 className="text-md font-semibold text-blue-800">Évolution du nombre de participants</h5>
+                    <div className="bg-blue-500 p-2 rounded-lg">
+                      <Users className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={prepareParticipantsEvolutionData()}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#dbeafe" />
+                        <XAxis 
+                          dataKey="name" 
+                          stroke="#1e40af"
+                          fontSize={11}
+                        />
+                        <YAxis 
+                          stroke="#1e40af"
+                          fontSize={11}
+                        />
+                        <Tooltip 
+                          contentStyle={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            border: '1px solid #3b82f6',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          }}
+                          formatter={(value: any, name: any, props: any) => [
+                            `${value} participants`,
+                            'Nombre de participants'
+                          ]}
+                          labelFormatter={(label, payload) => {
+                            if (payload && payload[0]) {
+                              return `${payload[0].payload.fullName} (${label})`;
+                            }
+                            return label;
+                          }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="participants" 
+                          stroke="#3b82f6" 
+                          strokeWidth={3}
+                          dot={{ fill: '#3b82f6', strokeWidth: 2, r: 5 }}
+                          activeDot={{ r: 7, stroke: '#1e40af', strokeWidth: 2 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Rates Evolution Chart */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-100 border border-green-200 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h5 className="text-md font-semibold text-green-800">Évolution des taux de présence et de sélection</h5>
+                    <div className="bg-green-500 p-2 rounded-lg">
+                      <ChartArea className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={prepareRatesEvolutionData()}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#dcfce7" />
+                        <XAxis 
+                          dataKey="name" 
+                          stroke="#166534"
+                          fontSize={11}
+                        />
+                        <YAxis 
+                          stroke="#166534"
+                          fontSize={11}
+                          domain={[0, 100]}
+                        />
+                        <Tooltip 
+                          contentStyle={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            border: '1px solid #22c55e',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          }}
+                          formatter={(value: any, name: any) => [
+                            `${value?.toFixed(1)}%`,
+                            name
+                          ]}
+                          labelFormatter={(label, payload) => {
+                            if (payload && payload[0]) {
+                              return `${payload[0].payload.fullName} (${label})`;
+                            }
+                            return label;
+                          }}
+                        />
+                        <Legend />
+                        <Line 
+                          type="monotone" 
+                          dataKey="Taux de présence" 
+                          stroke="#22c55e" 
+                          strokeWidth={3}
+                          dot={{ fill: '#22c55e', strokeWidth: 2, r: 5 }}
+                          activeDot={{ r: 7, stroke: '#16a34a', strokeWidth: 2 }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="Taux de sélection" 
+                          stroke="#059669" 
+                          strokeWidth={3}
+                          dot={{ fill: '#059669', strokeWidth: 2, r: 5 }}
+                          activeDot={{ r: 7, stroke: '#047857', strokeWidth: 2 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Rating Evolution Chart */}
+                <div className="bg-gradient-to-br from-yellow-50 to-amber-100 border border-yellow-200 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h5 className="text-md font-semibold text-yellow-800">Évolution de la note moyenne</h5>
+                    <div className="bg-yellow-500 p-2 rounded-lg">
+                      <Star className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={prepareRatingEvolutionData()}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#fef3c7" />
+                        <XAxis 
+                          dataKey="name" 
+                          stroke="#92400e"
+                          fontSize={11}
+                        />
+                        <YAxis 
+                          stroke="#92400e"
+                          fontSize={11}
+                          domain={[0, 5]}
+                        />
+                        <Tooltip 
+                          contentStyle={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            border: '1px solid #f59e0b',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          }}
+                          formatter={(value: any, name: any) => [
+                            `${value?.toFixed(1)}/5`,
+                            name
+                          ]}
+                          labelFormatter={(label, payload) => {
+                            if (payload && payload[0]) {
+                              return `${payload[0].payload.fullName} (${label})`;
+                            }
+                            return label;
+                          }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="Note moyenne" 
+                          stroke="#f59e0b" 
+                          strokeWidth={3}
+                          dot={{ fill: '#f59e0b', strokeWidth: 2, r: 5 }}
+                          activeDot={{ r: 7, stroke: '#d97706', strokeWidth: 2 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Historical Events Table */}
+            {statsData.historical_comparison.previous_events_data && statsData.historical_comparison.previous_events_data.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-lg font-semibold text-gray-700 mb-4">Historique des 5 derniers événements</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Événement</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Participants</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Taux Présence</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Taux Sélection</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note Moyenne</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {statsData.historical_comparison.previous_events_data.map((event: any, index: number) => (
+                        <tr key={event.event_id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {event.event_title}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(event.event_date).toLocaleDateString('fr-FR')}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {event.total_participants}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {event.attendance_rate}%
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {event.selection_rate}%
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {event.average_rating.toFixed(1)}/5
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Average Comparison Summary */}
+            {statsData.historical_comparison.average_previous_metrics && (
+              <div className="mt-6 bg-gray-50 p-4 rounded-lg">
+                <h4 className="text-lg font-semibold text-gray-700 mb-3">Moyenne des événements précédents</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-700">
+                      {statsData.historical_comparison.average_previous_metrics.total_participants}
+                    </div>
+                    <div className="text-sm text-gray-600">Participants</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-700">
+                      {statsData.historical_comparison.average_previous_metrics.attendance_rate}%
+                    </div>
+                    <div className="text-sm text-gray-600">Présence</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-700">
+                      {statsData.historical_comparison.average_previous_metrics.selection_rate}%
+                    </div>
+                    <div className="text-sm text-gray-600">Sélection</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-700">
+                      {statsData.historical_comparison.average_previous_metrics.average_rating}/5
+                    </div>
+                    <div className="text-sm text-gray-600">Note moyenne</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
     </div>
   );
 };
