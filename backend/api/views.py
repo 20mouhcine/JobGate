@@ -27,8 +27,19 @@ class EventView(APIView):
         """
         List all events.
         """
-        event = Event.objects.all()
-        serializer = EventSerializer(event, many=True)
+
+        archived = request.query_params.get("archived")
+        Event.objects.filter(end_date__lt=timezone.now(), is_archived=False).update(is_archived=True)
+
+        events = Event.objects.all()
+
+        if archived is not None:
+            if archived.lower() == "true":
+                events = events.filter(is_archived=True)
+            elif archived.lower() == "false":
+                events = events.filter(is_archived=False)
+
+        serializer = EventSerializer(events, many=True)
         return Response(serializer.data)
     
     def post(self, request):
@@ -59,9 +70,26 @@ class EventDetailView(APIView):
         
     def get(self, request, pk):
        event = self.get_object(pk)
+       if not event:
+            return Response({"error": "Event not found"}, status=404)
        serializer = EventSerializer(event)
        return Response(serializer.data)
     
+    def patch(self, request, pk):
+            """
+            Update partial fields of an event (e.g., archive/unarchive).
+            """
+            event = self.get_object(pk)
+            if not event:
+                return Response({"error": "Event not found"}, status=404)
+
+            is_archived = request.data.get("is_archived", None)
+            if is_archived is not None:
+                event.is_archived = bool(is_archived)
+                event.save()
+                return Response({"message": "Event updated successfully"})
+
+            return Response({"error": "No valid fields to update"}, status=400)
 
     """
     Update an event instance.

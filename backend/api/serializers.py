@@ -4,7 +4,7 @@ from .models import Event, Talent, Participation, TimeSlot
 class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
-        fields = ['id', 'image','caption','title', 'description', 'start_date','end_date', 'location', 'recruiterId','is_timeSlot_enabled','is_online','recruiters_number','meeting_link']
+        fields = ['id', 'image','caption','title', 'description', 'start_date','end_date', 'location', 'recruiterId','is_timeSlot_enabled','is_online','recruiters_number','meeting_link','is_archived']
         read_only_fields = ['id'] 
 
 class TalentSerializer(serializers.ModelSerializer):

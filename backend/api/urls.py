@@ -6,6 +6,9 @@ urlpatterns = [
     path('events/<int:pk>/', EventDetailView.as_view(), name='event-detail-update'),
     path('events/<int:event_id>/statistics/', EventStatisticsView.as_view(), name='event-statistics'),
     path('events/<int:event_id>/send-selection-email/', SendSelectionEmailView.as_view(), name='send-selection-email'),
+
+
+
     path('talents/', TalentView.as_view(), name='talents-list-create'),
     path('talents/<int:pk>/', TalentDetailView.as_view(), name='talent-detail-update'),
 

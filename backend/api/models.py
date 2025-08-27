@@ -17,6 +17,12 @@ class Event(models.Model):
     is_online = models.BooleanField(default=False)
     recruiters_number = models.IntegerField(default=1, null=True, blank=True)
     meeting_link = models.CharField(null=True, blank=True)
+    is_archived=models.BooleanField(default=False)
+    def check_and_archive(self):
+        """Archive the event if the end date has passed."""
+        if self.end_date < timezone.now() and not self.is_archived:
+            self.is_archived = True
+            self.save()
 
    
 class Talent(models.Model):
