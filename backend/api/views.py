@@ -965,6 +965,76 @@ class EventStatisticsView(APIView):
             'talent_id__name', 'talent_id__email', 'note', 'is_selected'
         )
         
+        # Historical comparison with previous events
+        previous_events = Event.objects.filter(
+            start_date__lt=event.start_date
+        ).order_by('-start_date')[:5]  # Get last 5 events before this one
+        
+        historical_comparison = []
+        avg_previous_metrics = {
+            'total_participants': 0,
+            'attendance_rate': 0,
+            'selection_rate': 0,
+            'average_rating': 0
+        }
+        
+        if previous_events.exists():
+            total_previous_events = 0
+            sum_participants = 0
+            sum_attendance_rate = 0
+            sum_selection_rate = 0
+            sum_rating = 0
+            
+            for prev_event in previous_events:
+                prev_participations = Participation.objects.filter(event_id=prev_event)
+                prev_total = prev_participations.count()
+                prev_attended = prev_participations.filter(has_attended=True).count()
+                prev_selected = prev_participations.filter(is_selected=True).count()
+                prev_avg_rating = prev_participations.aggregate(Avg('note'))['note__avg'] or 0
+                
+                prev_attendance_rate = (prev_attended / prev_total * 100) if prev_total > 0 else 0
+                prev_selection_rate = (prev_selected / prev_total * 100) if prev_total > 0 else 0
+                
+                historical_comparison.append({
+                    'event_id': prev_event.id,
+                    'event_title': prev_event.title,
+                    'event_date': prev_event.start_date,
+                    'total_participants': prev_total,
+                    'attendance_rate': round(prev_attendance_rate, 2),
+                    'selection_rate': round(prev_selection_rate, 2),
+                    'average_rating': round(prev_avg_rating, 2)
+                })
+                
+                # Accumulate for averages
+                if prev_total > 0:  # Only count events that had participants
+                    sum_participants += prev_total
+                    sum_attendance_rate += prev_attendance_rate
+                    sum_selection_rate += prev_selection_rate
+                    sum_rating += prev_avg_rating
+                    total_previous_events += 1
+            
+            # Calculate averages
+            if total_previous_events > 0:
+                avg_previous_metrics = {
+                    'total_participants': round(sum_participants / total_previous_events, 2),
+                    'attendance_rate': round(sum_attendance_rate / total_previous_events, 2),
+                    'selection_rate': round(sum_selection_rate / total_previous_events, 2),
+                    'average_rating': round(sum_rating / total_previous_events, 2)
+                }
+        
+        # Calculate comparison percentages
+        comparison_metrics = {}
+        if avg_previous_metrics['total_participants'] > 0:
+            comparison_metrics = {
+                'participants_change': round(
+                    ((total_participants - avg_previous_metrics['total_participants']) / 
+                     avg_previous_metrics['total_participants'] * 100), 2
+                ),
+                'attendance_change': round(attendance_rate - avg_previous_metrics['attendance_rate'], 2),
+                'selection_change': round(selection_rate - avg_previous_metrics['selection_rate'], 2),
+                'rating_change': round(avg_rating - avg_previous_metrics['average_rating'], 2)
+            }
+        
         # Compile all statistics
         statistics = {
             'event_info': {
@@ -984,6 +1054,17 @@ class EventStatisticsView(APIView):
                 'attendance_rate': round(attendance_rate, 2),
                 'selection_rate': round(selection_rate, 2),
                 'average_rating': round(avg_rating, 2)
+            },
+            'historical_comparison': {
+                'previous_events_data': historical_comparison,
+                'average_previous_metrics': avg_previous_metrics,
+                'comparison_metrics': comparison_metrics,
+                'performance_indicators': {
+                    'participants_trend': 'increase' if comparison_metrics.get('participants_change', 0) > 0 else 'decrease' if comparison_metrics.get('participants_change', 0) < 0 else 'stable',
+                    'attendance_trend': 'increase' if comparison_metrics.get('attendance_change', 0) > 0 else 'decrease' if comparison_metrics.get('attendance_change', 0) < 0 else 'stable',
+                    'selection_trend': 'increase' if comparison_metrics.get('selection_change', 0) > 0 else 'decrease' if comparison_metrics.get('selection_change', 0) < 0 else 'stable',
+                    'rating_trend': 'increase' if comparison_metrics.get('rating_change', 0) > 0 else 'decrease' if comparison_metrics.get('rating_change', 0) < 0 else 'stable'
+                }
             },
             'demographics': {
                 'by_establishment': list(establishment_stats),
