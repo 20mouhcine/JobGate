@@ -4,7 +4,8 @@ import { Route, Routes } from "react-router-dom";
 import EventsPage from "@/pages/events";
 import EventDetailsPage from "@/pages/eventDetails";
 import ParticipantDetailsPage from "./pages/ParticipantDetails";
-import Dashboard from "./pages/Dashboard";
+import Login from "./pages/Login";
+import Signup from "./pages/SignUp";
 function App() {
   
   return (
@@ -15,8 +16,8 @@ function App() {
         element={<ParticipantDetailsPage  />}
         path="/events/:eventId/participants/:talentId"
         />
-      <Route element={<Dashboard />} path="/" />
-
+      <Route element={<Login />} path="/" />
+      <Route element={<Signup />} path="/signup" />
 
     </Routes>
   );

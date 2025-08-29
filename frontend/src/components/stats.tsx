@@ -335,7 +335,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
   return (
     <div className="space-y-8">
       {/* Vue d'ensemble - Overview Chart */}
-        <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white  rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-gray-800">Vue d'ensemble des KPIs de l'événement</h3>
             <div className="flex items-center space-x-3">
