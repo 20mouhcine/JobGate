@@ -1,8 +1,25 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.contrib.auth.models import AbstractUser
 
 # Create your models here.
 
+class User(AbstractUser):
+    ROLE_CHOICES = [
+        ('recruiter', 'Recruiter'),
+        ('talent', 'Talent'),
+    ]
+    
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='talent')
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
+    phone = models.CharField(max_length=15, null=True, blank=True)
+
+    
+
+
+class Recruiter(models.Model):
+    user_id = models.OneToOneField(User, on_delete=models.CASCADE, related_name='recruiter_profile', null=True, blank=True)
+    company_name = models.CharField(max_length=100, null=True, blank=True)
 
 class Event(models.Model):
     title = models.CharField(max_length=200,null=True)
@@ -12,15 +29,18 @@ class Event(models.Model):
     start_date = models.DateTimeField(blank=True)
     end_date = models.DateTimeField(blank=True)
     location = models.CharField(max_length=200,null=True, blank=True)
-    recruiterId = models.IntegerField(null=True, blank=True)
+    recruiterId = models.IntegerField(null=True, blank=True)  # Keep for backward compatibility
     is_timeSlot_enabled = models.BooleanField(default=False)
     is_online = models.BooleanField(default=False)
     recruiters_number = models.IntegerField(default=1, null=True, blank=True)
     meeting_link = models.CharField(null=True, blank=True)
+    is_archived = models.BooleanField(default=False)
 
    
 class Talent(models.Model):
-    name = models.CharField(max_length=100, null=True, blank=True)
+    user_id = models.OneToOneField(User, on_delete=models.CASCADE, related_name='talent_profile', null=True, blank=True)
+    first_name = models.CharField(max_length=100, null=True, blank=True)
+    last_name = models.CharField(max_length=100, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
     phone = models.CharField(max_length=15, null=True, blank=True)
     etablissement = models.CharField(max_length=100,null=True, blank=True)

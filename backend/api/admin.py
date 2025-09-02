@@ -1,7 +1,18 @@
 from django.contrib import admin
-from .models import Event, Talent, Participation, TimeSlot
+from django.contrib.auth.admin import UserAdmin
+from .models import Event, Talent, Participation, TimeSlot, User,Recruiter
 
 # Register your models here.
+
+@admin.register(User)
+class CustomUserAdmin(UserAdmin):
+    list_display = [ 'email', 'first_name', 'last_name', 'role', 'is_active','phone']
+    list_filter = ['role', 'is_active', 'is_staff', 'date_joined']
+    search_fields = ['email', 'first_name', 'last_name']
+    
+    fieldsets = UserAdmin.fieldsets + (
+        ('Additional Info', {'fields': ('role', 'phone', 'etablissement', 'filiere', 'avatar')}),
+    )
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
@@ -11,10 +22,15 @@ class EventAdmin(admin.ModelAdmin):
     date_hierarchy = 'start_date'
     ordering = ['-start_date']
 
+@admin.register(Recruiter)
+class RecruiterAdmin(admin.ModelAdmin):
+    list_display = ['user_id', 'company_name']
+    search_fields = ['user_id__email', 'company_name']
+
 @admin.register(Talent)
 class TalentAdmin(admin.ModelAdmin):
-    list_display = ['name', 'email', 'phone', 'etablissement', 'filiere']
-    search_fields = ['name', 'email', 'etablissement', 'filiere']
+    list_display = ['first_name', 'last_name', 'email', 'etablissement', 'filiere']
+    search_fields = ['first_name', 'last_name', 'email', 'etablissement', 'filiere']
     list_filter = ['etablissement', 'filiere']
 
 @admin.register(Participation)

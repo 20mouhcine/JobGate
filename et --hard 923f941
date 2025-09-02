@@ -1,0 +1,21 @@
+[33md53d414[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/dev[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{0}: reset: moving to origin/main
+[33m923f941[m HEAD@{1}: checkout: moving from dev to dev
+[33m923f941[m HEAD@{2}: checkout: moving from dev to dev
+[33m923f941[m HEAD@{3}: commit (merge): Merge origin/main into dev and keep main version
+[33mbfc3e7a[m HEAD@{4}: checkout: moving from main to dev
+[33md53d414[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/dev[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{5}: pull origin main: Fast-forward
+[33m540fddb[m[33m ([m[1;32mtalents[m[33m)[m HEAD@{6}: checkout: moving from dev to main
+[33mbfc3e7a[m HEAD@{7}: checkout: moving from dev to dev
+[33mbfc3e7a[m HEAD@{8}: checkout: moving from dev to dev
+[33mbfc3e7a[m HEAD@{9}: commit: event details participations
+[33m1745e4d[m HEAD@{10}: commit (merge): Merge origin/main into dev and keep main version
+[33m914e747[m HEAD@{11}: checkout: moving from dev to dev
+[33m914e747[m HEAD@{12}: checkout: moving from dev to dev
+[33m914e747[m HEAD@{13}: commit: eventDetails (talent/user)
+[33mb500e69[m HEAD@{14}: commit: Fix: ignore venv folder
+[33mfa70c85[m HEAD@{15}: merge origin/main: Merge made by the 'ort' strategy.
+[33m0cf29f9[m HEAD@{16}: checkout: moving from dev to dev
+[33m0cf29f9[m HEAD@{17}: commit: inscription talents
+[33m540fddb[m[33m ([m[1;32mtalents[m[33m)[m HEAD@{18}: checkout: moving from talents to dev
+[33m540fddb[m[33m ([m[1;32mtalents[m[33m)[m HEAD@{19}: checkout: moving from main to talents
+[33m540fddb[m[33m ([m[1;32mtalents[m[33m)[m HEAD@{20}: clone: from https://github.com/20mouhcine/JobGate

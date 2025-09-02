@@ -1,49 +1,102 @@
-import { createContext, useContext, ReactNode } from 'react';
-
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-  avatar?: string;
-  role?: string;
-  hasAccount?:boolean;
-  etablissement?: String;
-  filiere?: String;
-}
-
-export interface UserContextType {
-  user: User | null;
-  setUser: (user: User | null) => void;
-}
+import { createContext, useContext, useState, useEffect } from 'react';
+import { User, UserContextType, UserProviderProps } from '@/types';
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-const MOCK_USER: User = {
-  id: 13,
-  name: 'John Doe',
-  email: 'john.doe@example.com',
-  avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-  role: 'recruiter',
-  hasAccount: false,
-  etablissement:"EMSI",
-  filiere:"Ingenierie informatique et réseaux",
-};
-
-
-interface UserProviderProps {
-  children: ReactNode;
-}
-
 export const UserProvider = ({ children }: UserProviderProps) => {
-  const user = MOCK_USER;
-  
+  const [user, setUserState] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Check if user is authenticated on mount
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      // Validate token with backend and get user data
+      fetchUserData(token);
+    } else {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchUserData = async (token: string) => {
+    try {
+      const response = await fetch('http://localhost:8000/api/auth/profile/', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUserState(userData);
+      } else {
+        // Token is invalid, remove it
+        localStorage.removeItem('authToken');
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      localStorage.removeItem('authToken');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const setUser = (newUser: User | null) => {
-    console.log('setUser called with:', newUser);
+    setUserState(newUser);
+  };
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://localhost:8000/api/auth/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Store the token
+        if (data.access) {
+          localStorage.setItem('authToken', data.access);
+        }
+        
+        // Set user data
+        if (data.user) {
+          setUserState(data.user);
+        }
+        
+        return true;
+      } else {
+        const errorData = await response.json();
+        console.error('Login failed:', errorData);
+        return false;
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('authToken');
+    setUserState(null);
   };
 
   const value: UserContextType = {
     user,
     setUser,
+    login,
+    logout,
+    isLoading,
+    isAuthenticated: !!user,
   };
 
   return (
@@ -65,5 +118,3 @@ export const useCurrentUser = (): User | null => {
   const { user } = useUser();
   return user;
 };
-
-export { MOCK_USER };

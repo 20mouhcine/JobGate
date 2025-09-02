@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@heroui/button";
-import { useUser } from "@/contexts/UserContext";
+import { useCurrentUser } from "@/contexts/UserContext";
 import { Tabs, Tab } from "@heroui/tabs";
 import { QrCode } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@heroui/popover";
@@ -27,52 +27,18 @@ import {
 import { Input } from "@heroui/input";
 import { Image as HeroImage } from "@heroui/image";
 import { Card, CardBody } from "@heroui/card";
-import {Chip} from "@heroui/chip";
+import { Chip } from "@heroui/chip";
 import { Link } from "react-router-dom";
-import { 
-  Table, 
-  TableHeader, 
-  TableColumn, 
-  TableBody, 
-  TableRow, 
+import {
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
   TableCell,
 } from "@heroui/table";
 
-
-interface Event {
-  id: string | number;
-  image?: string;
-  caption?: string;
-  title: string;
-  start_date: string;
-  end_date: string;
-  location: string;
-  description: string;
-  is_timeSlot_enabled: boolean;
-  is_online: boolean;
-}
-
-interface Talent {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  resume?: string;
-  etablissement?: string;
-  filiere?: string;
-}
-
-interface Participations {
-  id: number;
-  event_id: Event;
-  talent_id: Talent;
-  has_attended: boolean;
-  date_inscription: Date;
-  note: number;
-  comment: string;
-  rdv: Date;
-  is_selected: boolean;
-}
+import { Event, Talent, Participation } from '@/types';
 
 export default function EventDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -81,9 +47,8 @@ export default function EventDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const qrCodeRef = useRef<HTMLDivElement>(null);
-  const { user } = useUser();
+  const user = useCurrentUser();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
-  const [user_id, setUser_id] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -92,14 +57,13 @@ export default function EventDetailsPage() {
   const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(false);
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'selected' | 'not-selected'>('all');
+  const [selectedFilter, setSelectedFilter] = useState<
+    "all" | "selected" | "not-selected"
+  >("all");
 
-
-  const [participations, setParticipations] = useState<Participations[]>([]);
+  const [participations, setParticipations] = useState<Participation[]>([]);
 
   const [newCv, setNewCv] = useState<File | null>(null);
-
-
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -115,10 +79,15 @@ export default function EventDetailsPage() {
   } = useDisclosure();
 
   const {
-    isOpen: isRegistrationModalOpen,
-    onOpen: onOpenRegistrationModal,
-    onOpenChange: onOpenChangeRegistrationModal,
-    onClose: onCloseRegistrationModal,
+    isOpen: isArchiveOpen,
+    onOpen: onArchiveOpen,
+    onOpenChange: onArchiveOpenChange,
+  } = useDisclosure();
+
+  const {
+    isOpen: isUnarchiveOpen,
+    onOpen: onUnarchiveOpen,
+    onOpenChange: onUnarchiveOpenChange,
   } = useDisclosure();
   const {
     isOpen: isConfirmModalOpen,
@@ -228,6 +197,7 @@ export default function EventDetailsPage() {
     if (!id) return;
 
     setIsLoadingParticipations(true);
+    if(user?.role === "talent") return;
     try {
       const params = new URLSearchParams();
       params.append("page", page.toString());
@@ -237,6 +207,9 @@ export default function EventDetailsPage() {
 
       const response = await fetch(`${apiParticipationsUrl}${id}/?${params}`, {
         method: "GET",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
       });
 
       if (response.status === 404) {
@@ -262,7 +235,7 @@ export default function EventDetailsPage() {
   const sendEmailToSelectedTalents = async () => {
     if (!id) return;
 
-    const selectedTalents = participations.filter(p => p.is_selected);
+    const selectedTalents = participations.filter((p) => p.is_selected);
     if (selectedTalents.length === 0) {
       alert("Aucun talent sélectionné trouvé.");
       return;
@@ -270,18 +243,23 @@ export default function EventDetailsPage() {
 
     setIsLoadingEmail(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/events/${id}/send-selection-email/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          talent_ids: selectedTalents.map(p => p.talent_id.id)
-        }),
-      });
+      const response = await fetch(
+        `http://localhost:8000/api/events/${id}/send-selection-email/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            talent_ids: selectedTalents.map((p) => p.talent_id.id),
+          }),
+        }
+      );
 
       if (response.ok) {
-        alert(`Email envoyé avec succès à ${selectedTalents.length} talent(s) sélectionné(s)!`);
+        alert(
+          `Email envoyé avec succès à ${selectedTalents.length} talent(s) sélectionné(s)!`
+        );
         setEmailSent(true); // Hide the button after successful send
       } else {
         const errorData = await response.json();
@@ -295,8 +273,6 @@ export default function EventDetailsPage() {
     }
   };
 
-
-
   useEffect(() => {
     fetchParticipations(1, ""); // Initial load
   }, [id, user?.id]);
@@ -309,6 +285,34 @@ export default function EventDetailsPage() {
 
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
+
+  const DesarchiverEvenement = async () => {
+    try {
+      if (!event) return;
+
+      const response = await fetch(
+        `http://localhost:8000/api/events/${event.id}/`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+          },
+          body: JSON.stringify({ is_archived: false }),
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to unarchive the event");
+
+      setEvent((prev) => (prev ? { ...prev, is_archived: false } : null));
+      onUnarchiveOpenChange();
+      //fetchEvents();
+      window.location.href = "/events";
+    } catch (error) {
+      console.error(error);
+      alert("Erreur lors du désarchivage de l'événement.");
+    }
+  };
 
   // Handle page changes
   const handlePageChange = (newPage: number) => {
@@ -330,6 +334,9 @@ export default function EventDetailsPage() {
       try {
         const response = await fetch(`${apiUrl}${id}/`, {
           method: "GET",
+          headers: {
+            "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+          },
         });
 
         if (!response.ok) {
@@ -351,33 +358,31 @@ export default function EventDetailsPage() {
 
   useEffect(() => {
     const checkRegistrationStatus = async () => {
-      // Determine which talent ID to use
-      let talentId;
-
-      if (user?.hasAccount) {
-        // Use the logged-in user's ID
-        talentId = user.id;
-      } else if (user_id) {
-        // Use the newly created talent's ID
-        talentId = user_id;
-      } else {
-        // No talent ID available yet
-        return;
-      }
-
-      // Only proceed if we have both talent ID and event ID
-      if (!talentId || !event?.id) return;
+      // Only check registration for talents
+      if (!user || user.role !== "talent" || !event?.id) return;
 
       try {
+        // For talents, we don't need to pass talent_id - the backend will find their talent profile automatically
         const response = await fetch(
-          `http://localhost:8000/api/participations-details/?talent_id=${talentId}&event_id=${event.id}`
+          `http://localhost:8000/api/participations-details/?event_id=${event.id}`,
+          {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+            },
+          }
         );
         const data = await response.json();
+        console.log("Registration status check:", data);
 
-        if (data.detail === "Participation not found.") {
+        // If we get a participation object back, user is registered
+        if (data.detail === "Participation not found." || data.detail === "Talent profile not found") {
           setIsRegistered(false);
-        } else {
+        } else if (data.id) {
+          // If we get a participation with an ID, user is registered
           setIsRegistered(true);
+        } else {
+          setIsRegistered(false);
         }
       } catch (error) {
         console.error("Error checking registration status:", error);
@@ -386,7 +391,7 @@ export default function EventDetailsPage() {
     };
 
     checkRegistrationStatus();
-  }, [user?.id, user?.hasAccount, user_id, event?.id]);
+  }, [user?.id, user?.role, event?.id]);
 
   const handleCvChange = async () => {
     if (!newCv) {
@@ -394,33 +399,94 @@ export default function EventDetailsPage() {
       return;
     }
 
+    if (!user) {
+      alert("Erreur: utilisateur non connecté.");
+      return;
+    }
+
     try {
+      // First, upload the CV to the user's profile
       const cvData = new FormData();
       cvData.append("resume", newCv);
 
-      const response = await fetch("http://localhost:8000/api/talents/1/", {
-        method: "PUT",
-        body: cvData,
-      });
+      const response = await fetch(
+        `http://localhost:8000/api/auth/profile/`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          },
+          body: cvData,
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Erreur lors de la mise à jour du CV");
       }
 
       alert("CV importé avec succès !");
+
+      // Then, register for the event participation
+      const participationData: any = {
+        event_id: event?.id,
+      };
+
+      // Only include talent_id if user is not a talent (for recruiters/admins)
+      if (user.role !== "talent") {
+        participationData.talent_id = user?.talent_id || user?.id;
+      }
+
+      const participationResponse = await fetch(
+        `http://localhost:8000/api/participations/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          },
+          body: JSON.stringify(participationData),
+        }
+      );
+
+      if (!participationResponse.ok) {
+        const errorData = await participationResponse.json();
+        throw new Error(errorData.error || "Erreur lors de l'inscription à l'événement");
+      }
+
+      await participationResponse.json(); // Parse the response
+      alert("Inscription réussie !");
+      
+      // Update registration status
+      setIsRegistered(true);
+      
+      // Optionally refresh the page data
+      if (user.role === "recruiter") {
+        fetchParticipations();
+      }
+      
     } catch (error) {
-      console.error("Error updating CV:", error);
-      alert("Erreur lors de la mise à jour du CV");
+      console.error("Error updating CV or registering:", error);
+      alert(error instanceof Error ? error.message : "Erreur lors de la mise à jour du CV ou de l'inscription");
     }
   };
   const handleRegistrationClick = () => {
-    if (!user?.hasAccount) {
-      onOpenRegistrationModal();
-    } else if (user?.role === "talent") {
-      onOpenCvModal();
-    } else if (!isRegistered) {
-      onOpenRegistrationModal();
+    // Only allow registration for authenticated talents
+    if (!user) {
+      alert("Veuillez vous connecter pour vous inscrire à cet événement.");
+      return;
     }
+
+    if (user.role !== "talent") {
+      alert("Seuls les talents peuvent s'inscrire aux événements.");
+      return;
+    }
+
+    if (isRegistered) {
+      alert("Vous êtes déjà inscrit à cet événement.");
+      return;
+    }
+
+    onOpenCvModal();
   };
 
   const handleCvChoice = (choice: "keep" | "import") => {
@@ -441,9 +507,9 @@ export default function EventDetailsPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
           },
           body: JSON.stringify({
-            talent_id: user?.id,
             event_id: event?.id,
           }),
         }
@@ -472,63 +538,6 @@ export default function EventDetailsPage() {
       } else {
         alert("Erreur lors de l'inscription");
       }
-    } finally {
-      setIsLoadingRegistrations(false);
-    }
-  };
-
-  const handleRegistrationSubmit = async (formData: any) => {
-    setIsLoadingRegistrations(true);
-
-    try {
-      const form = new FormData();
-      form.append("name", formData.name);
-      form.append("email", formData.email);
-      form.append("phone", formData.phone);
-      form.append("resume", formData.resume);
-      form.append("etablissement", formData.etablissement);
-      form.append("filiere", formData.filiere);
-      form.append("event_id", id!);
-
-      const response = await fetch(
-        "http://localhost:8000/api/participations/",
-        {
-          method: "POST",
-          body: form,
-        }
-      );
-
-      // Handle different response scenarios
-      if (response.ok) {
-        const data = await response.json();
-        setUser_id(data.talent_id.id);
-        onCloseRegistrationModal();
-        setIsRegistered(true);
-        alert("Inscription réussie !");
-      } else {
-        // Handle specific error cases
-        const errorData = await response.json();
-
-        if (errorData.error === "No available RDV slots") {
-          alert(
-            "Désolé, tous les créneaux horaires sont complets pour cet événement."
-          );
-        } else if (errorData.error === "Already registered for this event") {
-          alert("Vous êtes déjà inscrit à cet événement.");
-          setIsRegistered(true);
-        } else {
-          alert(
-            "Erreur lors de l'inscription: " +
-              (errorData.error || "Erreur inconnue")
-          );
-        }
-
-        onCloseRegistrationModal();
-      }
-    } catch (error) {
-      console.error("Registration error:", error);
-      alert("Erreur lors de l'inscription");
-      onCloseRegistrationModal();
     } finally {
       setIsLoadingRegistrations(false);
     }
@@ -622,6 +631,7 @@ export default function EventDetailsPage() {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
         },
       });
 
@@ -635,28 +645,40 @@ export default function EventDetailsPage() {
       setError("Failed to cancel the event. Please try again later.");
     }
   };
+
+  const ArchiverEvenement = async () => {
+    try {
+      const response = await fetch(`${apiUrl}${id}/`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({ is_archived: true }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      window.location.href = "/events";
+    } catch (error) {
+      console.error("Error archiving event:", error);
+      setError("Failed to archive the event. Please try again later.");
+    }
+  };
+
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
   };
 
-  // Helper function to format participant names
-  const formatParticipantName = (name: string) => {
-    const nameParts = name.split(" ");
-    const firstName = nameParts[0];
-    const lastName = nameParts[1];
-    
-    const formattedFirst = firstName.charAt(0).toUpperCase() + firstName.slice(1);
-    const formattedLast = lastName ? lastName.charAt(0).toUpperCase() + lastName.slice(1) : "";
-    
-    return `${formattedFirst} ${formattedLast}`.trim();
-  };
-
+  
   const filteredParticipations = participations.filter((participation) => {
     // Apply selection filter
-    if (selectedFilter === 'selected' && !participation.is_selected) {
+    if (selectedFilter === "selected" && !participation.is_selected) {
       return false;
     }
-    if (selectedFilter === 'not-selected' && participation.is_selected) {
+    if (selectedFilter === "not-selected" && participation.is_selected) {
       return false;
     }
     // 'all' filter shows all participants, so no additional filtering needed
@@ -665,7 +687,7 @@ export default function EventDetailsPage() {
 
   // Define table columns
   const columns = [
-    { key: "name", label: "Nom" },
+    { key: "full_name", label: "Nom Complet" },
     { key: "email", label: "Email" },
     { key: "phone", label: "Téléphone" },
     { key: "etablissement", label: "Etablissement" },
@@ -677,7 +699,7 @@ export default function EventDetailsPage() {
   // Transform participations data for the table
   const tableData = filteredParticipations.map((p) => ({
     id: p.id.toString(),
-    name: formatParticipantName(p.talent_id.name),
+    full_name: `${p.talent_id.first_name} ${p.talent_id.last_name || ""}`,
     email: p.talent_id.email,
     phone: p.talent_id.phone,
     etablissement: p.talent_id.etablissement || "—",
@@ -687,17 +709,14 @@ export default function EventDetailsPage() {
     talent_id: p.talent_id.id,
   }));
 
+  console.log(tableData);
+
   const renderCell = (item: any, columnKey: React.Key) => {
     switch (columnKey) {
-      case "name":
-        return (
-          <Link
-            to={`participants/${item.talent_id}`}
-
-          >
-            {item.name}
-          </Link>
-        );
+      case "full_name":
+        return <Link to={`participants/${item.talent_id}`}>{item.full_name}</Link>;
+        case "phone":
+          return <span>{item.phone || "-"}</span>
       case "filiere":
         return (
           <span className="max-w-xs truncate" title={item.filiere}>
@@ -706,10 +725,12 @@ export default function EventDetailsPage() {
         );
       case "is_selected":
         return (
-
-            <Chip color={`${item.is_selected ? "success" : "danger"}`} variant="flat">
+          <Chip
+            color={`${item.is_selected ? "success" : "danger"}`}
+            variant="flat"
+          >
             {item.is_selected ? "Sélectionné" : "Non sélectionné"}
-            </Chip>
+          </Chip>
         );
       default:
         return item[columnKey as keyof typeof item];
@@ -769,9 +790,13 @@ export default function EventDetailsPage() {
       </DefaultLayout>
     );
   }
+  const endDate = event.end_date ? new Date(event.end_date) : null;
+  const now = new Date();
+  const isEventFinished = endDate ? endDate < now : false;
 
   // Format date for display
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return "Date non disponible";
     try {
       const date = new Date(dateString);
       return date.toLocaleDateString("fr-FR", {
@@ -869,7 +894,7 @@ export default function EventDetailsPage() {
                               {formatDate(event.start_date)} →{" "}
                               {formatDate(event.end_date)}
                             </p>
-                            {event.location === "" ? (
+                            {event?.location === "" ? (
                               <span> En ligne</span>
                             ) : (
                               <p>
@@ -880,13 +905,41 @@ export default function EventDetailsPage() {
                             <div className="mt-6">
                               {user?.role === "recruiter" ? (
                                 <>
-                                  <Button
-                                    onPress={onOpen}
-                                    color="danger"
-                                    variant="flat"
-                                  >
-                                    Annuler l'événement
-                                  </Button>
+                                  {!event.is_archived ? (
+                                    // ✅ Event is active
+                                    <div className="flex gap-2">
+                                      <Button
+                                        onPress={onOpen}
+                                        color="danger"
+                                        variant="flat"
+                                      >
+                                        Annuler l'événement
+                                      </Button>
+
+                                      <Button
+                                        onPress={onArchiveOpen}
+                                        color="primary"
+                                        variant="flat"
+                                      >
+                                        Archiver l'événement
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    // ✅ Event is archived
+                                    <div className="flex gap-2">
+                                      {!isEventFinished && (
+                                        <Button
+                                          onPress={onUnarchiveOpen}
+                                          color="secondary"
+                                          variant="flat"
+                                        >
+                                          Désarchiver l'événement
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Modal d’annulation */}
                                   <Modal
                                     isOpen={isOpen}
                                     onOpenChange={onOpenChange}
@@ -922,17 +975,99 @@ export default function EventDetailsPage() {
                                       )}
                                     </ModalContent>
                                   </Modal>
+
+                                  {/* Modal d’archivage */}
+                                  <Modal
+                                    isOpen={isArchiveOpen}
+                                    onOpenChange={onArchiveOpenChange}
+                                  >
+                                    <ModalContent>
+                                      {(onClose) => (
+                                        <>
+                                          <ModalHeader>
+                                            Confirmer l’archivage
+                                          </ModalHeader>
+                                          <ModalBody>
+                                            Êtes-vous sûr de vouloir archiver
+                                            cet événement ? Vous pourrez le
+                                            retrouver plus tard dans la liste
+                                            des événements archivés.
+                                          </ModalBody>
+                                          <ModalFooter>
+                                            <Button
+                                              color="danger"
+                                              variant="light"
+                                              onPress={onClose}
+                                            >
+                                              Non
+                                            </Button>
+                                            <Button
+                                              color="primary"
+                                              variant="flat"
+                                              onPress={ArchiverEvenement}
+                                            >
+                                              Oui, archiver
+                                            </Button>
+                                          </ModalFooter>
+                                        </>
+                                      )}
+                                    </ModalContent>
+                                  </Modal>
+
+                                  {/* Modal de désarchivage */}
+                                  <Modal
+                                    isOpen={isUnarchiveOpen}
+                                    onOpenChange={onUnarchiveOpenChange}
+                                  >
+                                    <ModalContent>
+                                      {(onClose) => (
+                                        <>
+                                          <ModalHeader>
+                                            Confirmer le désarchivage
+                                          </ModalHeader>
+                                          <ModalBody>
+                                            Voulez-vous restaurer cet événement
+                                            actif ?
+                                          </ModalBody>
+                                          <ModalFooter>
+                                            <Button
+                                              color="danger"
+                                              variant="light"
+                                              onPress={onClose}
+                                            >
+                                              Non
+                                            </Button>
+                                            <Button
+                                              color="primary"
+                                              variant="flat"
+                                              onPress={DesarchiverEvenement}
+                                            >
+                                              Oui, restaurer
+                                            </Button>
+                                          </ModalFooter>
+                                        </>
+                                      )}
+                                    </ModalContent>
+                                  </Modal>
                                 </>
                               ) : (
-                                <Button
-                                  className="mt-4"
-                                  color="primary"
-                                  variant="flat"
-                                  isDisabled={isRegistered}
-                                  onPress={handleRegistrationClick}
-                                >
-                                  {isRegistered ? "Déjà inscrit" : "S'inscrire"}
-                                </Button>
+                                // ✅ Talents - Only show registration for authenticated talents
+                                user &&
+                                user.role === "talent" && (
+                                  <Button
+                                    className="mt-4"
+                                    color="primary"
+                                    variant="flat"
+                                    isDisabled={
+                                      isRegistered
+                                    }
+                                    onPress={handleRegistrationClick}
+                                  >
+                                    {isRegistered
+                                      ? "Déjà inscrit"
+                                      : "S'inscrire"}
+                                  </Button>
+                                )
                               )}
                             </div>
                           </div>
@@ -969,25 +1104,40 @@ export default function EventDetailsPage() {
                                 {filteredParticipations.length > 0 && (
                                   <span>
                                     {filteredParticipations.length} participant
-                                    {filteredParticipations.length > 1 ? "s" : ""} affiché
-                                    {filteredParticipations.length > 1 ? "s" : ""}
+                                    {filteredParticipations.length > 1
+                                      ? "s"
+                                      : ""}{" "}
+                                    affiché
+                                    {filteredParticipations.length > 1
+                                      ? "s"
+                                      : ""}
                                     {searchQuery && ` pour "${searchQuery}"`}
                                   </span>
                                 )}
                               </div>
                             </div>
-                            
+
                             {/* Selection Filter */}
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-3">
-                                <span className="text-sm font-medium text-gray-700">Filtrer par sélection:</span>
+                                <span className="text-sm font-medium text-gray-700">
+                                  Filtrer par sélection:
+                                </span>
                                 <div className="flex space-x-2">
                                   <Button
                                     size="sm"
-                                    variant={selectedFilter === 'all' ? 'solid' : 'bordered'}
-                                    color={selectedFilter === 'all' ? 'primary' : 'default'}
+                                    variant={
+                                      selectedFilter === "all"
+                                        ? "solid"
+                                        : "bordered"
+                                    }
+                                    color={
+                                      selectedFilter === "all"
+                                        ? "primary"
+                                        : "default"
+                                    }
                                     onClick={() => {
-                                      setSelectedFilter('all');
+                                      setSelectedFilter("all");
                                       setEmailSent(false);
                                     }}
                                   >
@@ -995,45 +1145,76 @@ export default function EventDetailsPage() {
                                   </Button>
                                   <Button
                                     size="sm"
-                                    variant={selectedFilter === 'selected' ? 'solid' : 'bordered'}
-                                    color={selectedFilter === 'selected' ? 'success' : 'default'}
+                                    variant={
+                                      selectedFilter === "selected"
+                                        ? "solid"
+                                        : "bordered"
+                                    }
+                                    color={
+                                      selectedFilter === "selected"
+                                        ? "success"
+                                        : "default"
+                                    }
                                     onClick={() => {
-                                      setSelectedFilter('selected');
+                                      setSelectedFilter("selected");
                                       setEmailSent(false);
                                     }}
                                   >
-                                    Sélectionnés ({participations.filter(p => p.is_selected).length})
+                                    Sélectionnés (
+                                    {
+                                      participations.filter(
+                                        (p) => p.is_selected
+                                      ).length
+                                    }
+                                    )
                                   </Button>
                                   <Button
                                     size="sm"
-                                    variant={selectedFilter === 'not-selected' ? 'solid' : 'bordered'}
-                                    color={selectedFilter === 'not-selected' ? 'warning' : 'default'}
+                                    variant={
+                                      selectedFilter === "not-selected"
+                                        ? "solid"
+                                        : "bordered"
+                                    }
+                                    color={
+                                      selectedFilter === "not-selected"
+                                        ? "warning"
+                                        : "default"
+                                    }
                                     onClick={() => {
-                                      setSelectedFilter('not-selected');
+                                      setSelectedFilter("not-selected");
                                       setEmailSent(false);
                                     }}
                                   >
-                                    Non sélectionnés ({participations.filter(p => !p.is_selected).length})
+                                    Non sélectionnés (
+                                    {
+                                      participations.filter(
+                                        (p) => !p.is_selected
+                                      ).length
+                                    }
+                                    )
                                   </Button>
                                 </div>
                               </div>
-                              
+
                               {/* Email Button - Only show when "selected" filter is active and email not sent yet */}
-                              {selectedFilter === 'selected' && 
-                               !emailSent && 
-                               participations.filter(p => p.is_selected).length > 0 && (
-                                <Button
-                                  size="sm"
-                                  color="primary"
-                                  variant="solid"
-                                  startContent={<Mail size={16} />}
-                                  isLoading={isLoadingEmail}
-                                  onPress={sendEmailToSelectedTalents}
-                                  className="bg-blue-600 hover:bg-blue-700"
-                                >
-                                  {isLoadingEmail ? "Envoi..." : "Envoyer email"}
-                                </Button>
-                              )}
+                              {selectedFilter === "selected" &&
+                                !emailSent &&
+                                participations.filter((p) => p.is_selected)
+                                  .length > 0 && (
+                                  <Button
+                                    size="sm"
+                                    color="primary"
+                                    variant="solid"
+                                    startContent={<Mail size={16} />}
+                                    isLoading={isLoadingEmail}
+                                    onPress={sendEmailToSelectedTalents}
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                  >
+                                    {isLoadingEmail
+                                      ? "Envoi..."
+                                      : "Envoyer email"}
+                                  </Button>
+                                )}
                             </div>
                           </div>
 
@@ -1043,11 +1224,7 @@ export default function EventDetailsPage() {
                             </div>
                           ) : (
                             <>
-                              <Table
-                                aria-label="Participants table"
-                                
-                                
-                              >
+                              <Table aria-label="Participants table">
                                 <TableHeader columns={columns}>
                                   {(column) => (
                                     <TableColumn key={column.key}>
@@ -1055,11 +1232,13 @@ export default function EventDetailsPage() {
                                     </TableColumn>
                                   )}
                                 </TableHeader>
-                                <TableBody 
+                                <TableBody
                                   items={tableData}
                                   emptyContent={
                                     <div className="flex flex-col items-center justify-center py-12">
-                                      <div className="text-gray-400 text-4xl mb-2">👥</div>
+                                      <div className="text-gray-400 text-4xl mb-2">
+                                        👥
+                                      </div>
                                       <p className="text-gray-500 text-sm">
                                         {searchQuery
                                           ? `Aucun participant trouvé pour "${searchQuery}"`
@@ -1081,7 +1260,9 @@ export default function EventDetailsPage() {
                                   {(item) => (
                                     <TableRow key={item.id}>
                                       {(columnKey) => (
-                                        <TableCell>{renderCell(item, columnKey)}</TableCell>
+                                        <TableCell>
+                                          {renderCell(item, columnKey)}
+                                        </TableCell>
                                       )}
                                     </TableRow>
                                   )}
@@ -1262,23 +1443,19 @@ export default function EventDetailsPage() {
                             </Modal>
                           </>
                         ) : (
-                          <Button
-                            className="mt-4"
-                            color="primary"
-                            variant="flat"
-                            isDisabled={isRegistered}
-                            onPress={() => {
-                              if (!user?.hasAccount) {
-                                onOpenRegistrationModal();
-                              } else if (user?.role === "talent") {
-                                onOpenCvModal();
-                              } else if (!isRegistered) {
-                                onOpenRegistrationModal();
-                              }
-                            }}
-                          >
-                            {isRegistered ? "Déjà inscrit" : "S'inscrire"}
-                          </Button>
+                          // Only show registration button for authenticated talents
+                          user &&
+                          user.role === "talent" && (
+                            <Button
+                              className="mt-4"
+                              color="primary"
+                              variant="flat"
+                              isDisabled={isRegistered}
+                              onPress={handleRegistrationClick}
+                            >
+                              {isRegistered ? "Déjà inscrit" : "S'inscrire"}
+                            </Button>
+                          )
                         )}
                       </div>
                     </div>
@@ -1328,73 +1505,6 @@ export default function EventDetailsPage() {
             </ModalFooter>
           </ModalContent>
         </Modal>
-
-        {/* Registration Modal for unauthenticated users */}
-        {!user?.hasAccount && (
-          <Modal
-            isOpen={isRegistrationModalOpen}
-            onOpenChange={onOpenChangeRegistrationModal}
-            size="lg"
-          >
-            <ModalContent>
-              <ModalHeader className="flex flex-col gap-1">
-                Inscription à l'événement
-              </ModalHeader>
-              <ModalBody>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const formData = new FormData(e.target as HTMLFormElement);
-                    handleRegistrationSubmit({
-                      name: formData.get("name") as string,
-                      email: formData.get("email") as string,
-                      phone: formData.get("phone") as string,
-                      etablissement: formData.get("etablissement") as string,
-                      filiere: formData.get("filiere") as string,
-                      resume: formData.get("resume") as File,
-                    });
-                  }}
-                  className="space-y-4"
-                >
-                  <Input label="Full Name" name="name" required />
-
-                  <Input label="Email" name="email" type="email" required />
-
-                  <Input label="Téléphone" name="phone" required />
-
-                  <Input
-                    type="text"
-                    label="Etablissement"
-                    name="etablissement"
-                    required
-                  />
-                  <Input type="text" label="Filière" name="filiere" required />
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      CV (PDF, DOC, DOCX)
-                    </label>
-                    <input
-                      type="file"
-                      name="resume"
-                      accept=".pdf,.doc,.docx"
-                      required
-                      className="block w-full text-sm text-gray-700 bg-white border border-gray-300 rounded-md p-2"
-                    />
-                  </div>
-
-                  <Button
-                    type="submit"
-                    color="primary"
-                    disabled={isLoadingRegistrations}
-                  >
-                    {isLoadingRegistrations ? "En cours..." : "Soumettre"}
-                  </Button>
-                </form>
-              </ModalBody>
-            </ModalContent>
-          </Modal>
-        )}
 
         <Modal isOpen={isConfirmModalOpen} onOpenChange={onCloseConfirmModal}>
           <ModalContent>

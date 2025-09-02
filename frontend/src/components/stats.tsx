@@ -32,7 +32,6 @@ const Stats = ({ eventId }: { eventId: number }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-
   // Chart colors (matching eventDetails.tsx)
   const COLORS = {
     primary: '#3B82F6',
@@ -70,8 +69,12 @@ const Stats = ({ eventId }: { eventId: number }) => {
         
         // Fetch event info and statistics in parallel
         const [eventResponse, statsResponse] = await Promise.all([
-          fetch(`http://localhost:8000/api/events/${eventId}/`),
-          fetch(`http://localhost:8000/api/events/${eventId}/statistics/`)
+          fetch(`http://localhost:8000/api/events/${eventId}/`,{headers:{
+            "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+          }}),
+          fetch(`http://localhost:8000/api/events/${eventId}/statistics/`,{headers:{
+            "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+          }})
         ]);
         
         if (!eventResponse.ok || !statsResponse.ok) {
@@ -335,7 +338,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
   return (
     <div className="space-y-8">
       {/* Vue d'ensemble - Overview Chart */}
-        <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white  rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-gray-800">Vue d'ensemble des KPIs de l'événement</h3>
             <div className="flex items-center space-x-3">
@@ -362,7 +365,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
           {/* KPIs Grid */}
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {/* Total des talents inscrits */}
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border-blue-200">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-blue-600 text-xs font-semibold uppercase tracking-wide">Total Inscrits</div>
@@ -553,7 +556,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
         {/* Charts */}
         <div id="stats-charts-container" className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Attendance Rate */}
-          <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="attendance">
+          <div className="bg-white  rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="attendance">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800">Taux de Présence</h3>
               <div className="bg-green-100 p-2 rounded-lg">
@@ -602,7 +605,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
           </div>
 
           {/* Top Institutions */}
-          <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="establishments">
+          <div className="bg-white  rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="establishments">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800">Établissements les Plus Représentés</h3>
               <div className="bg-blue-100 p-2 rounded-lg">
@@ -650,7 +653,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
         {/* Selection and Conversion Charts */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Selection Rate Chart */}
-          <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="selection">
+          <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="selection">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-800">Taux de Sélection</h3>
               <div className="bg-emerald-100 p-2 rounded-lg">
@@ -700,7 +703,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
 
           {/* Filières Chart */}
           {stats.filieres.length > 0 && (
-            <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="filieres">
+            <div className="bg-white  rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="filieres">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-gray-800">Filières les Plus Représentées</h3>
                 <div className="bg-purple-100 p-2 rounded-lg">
@@ -747,7 +750,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
         </div>
 
         {/* Conversion Funnel */}
-        <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="funnel">
+        <div className="bg-white  rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow" data-chart="funnel">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-gray-800">Entonnoir de Conversion</h3>
             <div className="bg-indigo-100 p-2 rounded-lg">
@@ -819,7 +822,7 @@ const Stats = ({ eventId }: { eventId: number }) => {
 
         {/* Historical Comparison Section */}
         {statsData?.historical_comparison && (
-          <div className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-white  rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-800">Comparaison avec les événements précédents</h3>
               <div className="bg-purple-100 p-2 rounded-lg">
