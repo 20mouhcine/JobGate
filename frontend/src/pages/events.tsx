@@ -14,62 +14,29 @@ import {
   useDisclosure,
 } from "@heroui/modal";
 import { DatePicker } from "@heroui/date-picker";
-import { CalendarDate } from "@internationalized/date";
+import { CalendarDate, CalendarDateTime, ZonedDateTime } from "@internationalized/date";
 import { Switch } from "@heroui/switch";
 import { TimeInput } from "@heroui/date-input";
 import { NumberInput } from "@heroui/number-input";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import { useUser } from "@/contexts/UserContext";
-import { CardBody } from "@heroui/card";
-import { Archive, CalendarDays, CircleAlert } from "lucide-react";
+import { useCurrentUser } from "@/contexts/UserContext";
+import { Archive, CalendarDays } from "lucide-react";
 
+import { Event, EventFormData, TimeSlotFormData } from '@/types';
 // Define proper types
-interface Event {
-  id: string | number;
-  image?: File | null;
-  caption?: string;
-  title: string;
-  date: string;
-  location: string | null;
-  description: string;
-  is_timeSlot_enabled: boolean;
-  is_online?: boolean;
-  recruiters_number?: number;
-  meeting_link?: string | null;
-}
-
-interface FormData {
-  title: string;
-  image?: File | null;
-  caption?: string;
-  start_date: CalendarDate | null;
-  end_date: CalendarDate | null;
-  location: string | null;
-  description: string;
-  is_timeSlot_enabled: boolean;
-  recruiterId: number | null;
-  recruiters_number?: number;
-  is_online?: boolean;
-  meeting_link?: string | null;
-}
-
-interface TimeSlotFormData {
-  startTime: string;
-  endTime: string;
-  slot: number;
-}
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
-  const [archivedEvents, setArchivedEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const steps = ["Basic info", "description", "Time slots"];
-  const { user } = useUser();
-  const [formData, setFormData] = useState<FormData>({
+  const  user  = useCurrentUser();
+  const [selected, setSelected] = useState<React.Key>("events");
+
+  const [formData, setFormData] = useState<EventFormData>({
     title: "",
     image: null,
     caption: "",
@@ -84,8 +51,8 @@ export default function EventsPage() {
     meeting_link: null,
   });
   const [timeSlotData, setTimeSlotData] = useState<TimeSlotFormData>({
-    startTime: "",
-    endTime: "",
+    start_time: "",
+    end_time: "",
     slot: 10,
   });
 
@@ -98,11 +65,9 @@ export default function EventsPage() {
   };
 
   const apiUrl =
-    import.meta.env.VITE_API_URL || "http://localhost:8000/api/events/?archived=false";
-  const apiUrlArchivedEvents =
-    import.meta.env.VITE_API_URL || "http://localhost:8000/api/events/?archived=true";
-  //change this to archivedEvents
-  const timeSlotApiUrl =
+    import.meta.env.VITE_API_URL || `http://localhost:8000/api/events/`;
+
+    const timeSlotApiUrl =
     import.meta.env.VITE_TIMESLOT_API_URL ||
     "http://localhost:8000/api/time-slots/";
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -122,10 +87,17 @@ export default function EventsPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(apiUrl, {
+
+        if(selected==="archivedEvents") setEvents([]);
+        const currentApiUrl = selected === "archivedEvents" ? 
+          `http://localhost:8000/api/events/?archived=true` : 
+          apiUrl;
+
+        const response = await fetch(currentApiUrl, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem('authToken')}`
           },
         });
         if (!response.ok) {
@@ -142,36 +114,7 @@ export default function EventsPage() {
     };
 
     fetchEvents();
-  }, [apiUrl]);
-
-
-  useEffect(() => {
-    const fetchEvents = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(apiUrlArchivedEvents, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        setArchivedEvents(data);
-      } catch (error) {
-        console.error("Error fetching events:", error);
-        setError("Failed to fetch events. Please try again later.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchEvents();
-  }, [apiUrlArchivedEvents]);
-
+  }, [apiUrl,selected]);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,13 +125,13 @@ export default function EventsPage() {
     }));
   };
 
-  const handleStartDateChange = (start_date: CalendarDate | null) => {
+  const handleStartDateChange = (start_date: CalendarDate | CalendarDateTime | ZonedDateTime | null) => {
     setFormData((prev) => ({
       ...prev,
       start_date,
     }));
   };
-  const handleEndDateChange = (end_date: CalendarDate | null) => {
+  const handleEndDateChange = (end_date: CalendarDate | CalendarDateTime | ZonedDateTime | null) => {
     setFormData((prev) => ({
       ...prev,
       end_date,
@@ -203,8 +146,8 @@ export default function EventsPage() {
 
     if (!isSelected) {
       setTimeSlotData({
-        startTime: "",
-        endTime: "",
+        start_time: "",
+        end_time: "",
         slot: 10,
       });
     }
@@ -226,7 +169,7 @@ export default function EventsPage() {
     const timeString = time
       ? `${String(time.hour).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}`
       : "";
-    handleTimeSlotChange("startTime", timeString);
+    handleTimeSlotChange("start_time", timeString);
   };
 
   // Handle end time change
@@ -235,7 +178,7 @@ export default function EventsPage() {
     const timeString = time
       ? `${String(time.hour).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}`
       : "";
-    handleTimeSlotChange("endTime", timeString);
+    handleTimeSlotChange("end_time", timeString);
   };
 
   // Handle slot duration change
@@ -285,8 +228,8 @@ export default function EventsPage() {
       case 2:
         if (!formData.is_timeSlot_enabled) return true;
         return (
-          timeSlotData.startTime !== "" &&
-          timeSlotData.endTime !== "" &&
+          timeSlotData.start_time !== "" &&
+          timeSlotData.end_time !== "" &&
           timeSlotData.slot > 0
         );
       default:
@@ -314,8 +257,8 @@ export default function EventsPage() {
     // If time slots are enabled, validate time slot fields
     if (formData.is_timeSlot_enabled) {
       const timeSlotFieldsValid =
-        timeSlotData.startTime !== "" &&
-        timeSlotData.endTime !== "" &&
+        timeSlotData.start_time !== "" &&
+        timeSlotData.end_time !== "" &&
         timeSlotData.slot > 0;
       return basicFieldsValid && timeSlotFieldsValid;
     }
@@ -401,6 +344,9 @@ export default function EventsPage() {
         method: "POST",
         // Don't set Content-Type header - let browser set it with boundary
         body: formDataToSend,
+        headers:{
+          "Authorization": `Bearer ${localStorage.getItem('authToken')}`
+        }
       });
 
       if (!eventResponse.ok) {
@@ -416,8 +362,8 @@ export default function EventsPage() {
       if (formData.is_timeSlot_enabled && newEvent.id) {
         const timeSlotPayload = {
           event: newEvent.id,
-          start_time: timeSlotData.startTime,
-          end_time: timeSlotData.endTime,
+          start_time: timeSlotData.start_time,
+          end_time: timeSlotData.end_time,
           slot_duration: timeSlotData.slot,
         };
 
@@ -425,6 +371,7 @@ export default function EventsPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem('authToken')}`,
           },
           body: JSON.stringify(timeSlotPayload),
         });
@@ -456,8 +403,8 @@ export default function EventsPage() {
         meeting_link: null,
       });
       setTimeSlotData({
-        startTime: "",
-        endTime: "",
+        start_time: "",
+        end_time: "",
         slot: 10,
       });
 
@@ -496,8 +443,8 @@ export default function EventsPage() {
       meeting_link: null,
     });
     setTimeSlotData({
-      startTime: "",
-      endTime: "",
+      start_time: "",
+      end_time: "",
       slot: 10,
     });
     onOpenChange();
@@ -511,6 +458,8 @@ export default function EventsPage() {
           <Tabs aria-label="Options" className="mt-3 mr-18">
             <Tab
               key="events"
+            
+              onClick={() => setSelected("events")}
               title={
                 <div className="flex items-center gap-2 justify-center">
                   <CalendarDays className="w-5 h-5 text-primary" />
@@ -536,6 +485,8 @@ export default function EventsPage() {
 
                   </div>
 
+              
+
                   {/* Error display */}
                   {error && (
                     <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
@@ -553,22 +504,14 @@ export default function EventsPage() {
                       {events
                         .filter((event) =>
                           event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           event.description.toLowerCase().includes(searchTerm.toLowerCase())
                         )
                         .map((event) => (
                           <EventCard key={event.id} event={event} />
                         ))}
 
-                      {events.filter((event) =>
-                        event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        event.description.toLowerCase().includes(searchTerm.toLowerCase())
-                      ).length === 0 && (
-                          <div className="col-span-full text-center py-8 text-gray-500">
-                            No events match your search.
-                          </div>
-                        )}
+                    
                     </div>
 
                   )}
@@ -901,6 +844,8 @@ export default function EventsPage() {
             </Tab>
             <Tab
               key="archivedEvents"
+              onClick={() => setSelected("archivedEvents")}
+
               title={
                 <div className="flex items-center gap-2 justify-center">
                   <Archive className="w-5 h-5 text-gray-600" />
@@ -935,25 +880,16 @@ export default function EventsPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
-                      {archivedEvents
+                      {events
                         .filter((event) =>
                           event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           event.description.toLowerCase().includes(searchTerm.toLowerCase())
                         )
                         .map((event) => (
                           <EventCard key={event.id} event={event} />
                         ))}
 
-                      {archivedEvents.filter((event) =>
-                        event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        event.description.toLowerCase().includes(searchTerm.toLowerCase())
-                      ).length === 0 && (
-                          <div className="col-span-full text-center py-8 text-gray-500">
-                            No events match your search.
-                          </div>
-                        )}
                     </div>
 
                   )}
@@ -1288,20 +1224,7 @@ export default function EventsPage() {
           ) : (
               <section className="py-8 md:py-10">
                 <div className="w-full max-w-7xl mx-auto px-4">
-                  <div className="flex justify-between items-center mb-6">
-                    <Input
-                      className="w-auto max-w-xs"
-                      placeholder="Search events..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    {
-                      user.role === "recruiter" && (<Button onPress={onOpen} color="primary">
-                        Creer un evenment
-                      </Button>)
-                    }
-
-                  </div>
+                  
 
                   {/* Error display */}
                   {error && (
@@ -1320,22 +1243,22 @@ export default function EventsPage() {
                       {events
                         .filter((event) =>
                           event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           event.description.toLowerCase().includes(searchTerm.toLowerCase())
                         )
                         .map((event) => (
                           <EventCard key={event.id} event={event} />
                         ))}
 
-                      {events.filter((event) =>
+                      {/* {events.filter((event) =>
                         event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         event.description.toLowerCase().includes(searchTerm.toLowerCase())
                       ).length === 0 && (
                           <div className="col-span-full text-center py-8 text-gray-500">
                             No events match your search.
                           </div>
-                        )}
+                        )} */}
                     </div>
 
                   )}

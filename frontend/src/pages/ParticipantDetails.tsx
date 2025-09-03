@@ -25,6 +25,7 @@ import {
   Users,
   CornerDownLeft,
 } from "lucide-react";
+import { Talent, Participation } from '@/types';
 
 import ParticipantInfoCard from "@/components/ParticipantInfoCard";
 // Import the styles
@@ -34,39 +35,10 @@ import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
 // Import styles
 import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 
+// Import PDF.js worker
+import 'pdfjs-dist/build/pdf.worker.min.js';
+
 // import { addToast } from '@heroui/toast';
-
-interface Talent {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  resume?: string;
-  etablissement?: string;
-  filiere?: string;
-  avatar?: string;
-  linkedin?: string;
-  github?: string;
-  portfolio?: string;
-  skills?: string[];
-  experience_years?: number;
-  location?: string;
-}
-
-interface Participation {
-  id: number;
-  talent_id: Talent;
-  has_attended: boolean;
-  date_inscription: string;
-  note: number;
-  comment: string;
-  rdv: Date;
-  is_selected: boolean;
-  event_time_slot: {
-    start_time: string;
-    end_time: string;
-  } | null;
-}
 
 const StarRating = ({
   rating,
@@ -162,7 +134,11 @@ export default function ParticipantDetailsPage() {
     try {
       setLoading(true);
       const response = await fetch(
-        `${API_URL}participations-details/?event_id=${eventId}&talent_id=${talentId}`
+        `${API_URL}participations-details/?event_id=${eventId}&talent_id=${talentId}`,{
+          headers: {
+            "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+          }
+        }
       );
 
       if (!response.ok) {
@@ -187,6 +163,7 @@ export default function ParticipantDetailsPage() {
       setLoading(false);
     }
   }, [eventId, talentId]);
+  console.log("Participant data:", participant);
 
   useEffect(() => {
     if (eventId && talentId) {
@@ -203,6 +180,7 @@ export default function ParticipantDetailsPage() {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem("authToken")}`
           },
           body: JSON.stringify({
             note: formData.note,
@@ -484,7 +462,7 @@ export default function ParticipantDetailsPage() {
           <ModalContent>
             <ModalHeader>
               <h3 className="text-lg font-semibold">
-                {participant.talent_id.name} - Resume
+                {participant.talent_id.first_name} - Resume
               </h3>
             </ModalHeader>
             <ModalBody className="p-0">

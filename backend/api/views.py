@@ -1,6 +1,9 @@
 from rest_framework.views import APIView
-from .models import Event, Talent, Participation, TimeSlot
-from .serializers import EventSerializer, TalentSerializer, ParticipationSerializer,TimeSlotSerializer,UserEventsSerializer
+from .models import Event, Talent, Participation, TimeSlot, User
+from .serializers import (
+    EventSerializer, TalentSerializer, ParticipationSerializer, TimeSlotSerializer,
+    UserSerializer, UserRegistrationSerializer, UserLoginSerializer
+)
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.files.storage import default_storage
@@ -11,10 +14,92 @@ from rest_framework.generics import ListAPIView
 from rest_framework import filters
 from django.db.models import Q, Count, Avg
 from django.utils import timezone
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated, BasePermission
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
 
 
+# Custom Permissions
+class IsRecruiter(BasePermission):
+    """
+    Custom permission to only allow recruiters to access the view.
+    """
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and request.user.role == 'recruiter'
+
+class IsTalent(BasePermission):
+    """
+    Custom permission to only allow talents to access the view.
+    """
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and request.user.role == 'talent'
 
 
+# Authentication Views
+
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = UserRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'user': UserSerializer(user).data,
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = UserLoginSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.validated_data['user']
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'user': UserSerializer(user).data,
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+    def put(self, request):
+        if request.user.role == "talent":
+            serializer = TalentSerializer(request.user.talent_profile, data=request.data, partial=True)
+        else:
+            serializer = UserSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data["refresh"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({"message": "Successfully logged out"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Create your views here.
@@ -22,36 +107,46 @@ from django.utils import timezone
 
 
 class EventView(APIView):
+    def get_permissions(self):
+        """
+        Allow GET requests without authentication, require authentication for POST
+        """
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get(self, request):
         """
         List all events.
         """
-
-        archived = request.query_params.get("archived")
-        Event.objects.filter(end_date__lt=timezone.now(), is_archived=False).update(is_archived=True)
-
-        events = Event.objects.all()
-
+        # Handle archived query parameter
+        archived = request.GET.get('archived', None)
+        
         if archived is not None:
-            if archived.lower() == "true":
-                events = events.filter(is_archived=True)
-            elif archived.lower() == "false":
-                events = events.filter(is_archived=False)
-
+            # Convert string to boolean
+            is_archived = archived.lower() == 'true'
+            events = Event.objects.filter(is_archived=is_archived)
+        else:
+            events = Event.objects.all()
+            
         serializer = EventSerializer(events, many=True)
         return Response(serializer.data)
     
     def post(self, request):
         """
-        Create a new event.
+        Create a new event. Only authenticated recruiters can create events.
         """
+        if request.user.role != 'recruiter':
+            return Response(
+                {"error": "Only recruiters can create events"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         serializer = EventSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-
-            return Response(serializer.data, status=201)
-        return Response(serializer.errors, status=400)
+            serializer.save(recruiterId=request.user.id)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     
     
@@ -70,26 +165,9 @@ class EventDetailView(APIView):
         
     def get(self, request, pk):
        event = self.get_object(pk)
-       if not event:
-            return Response({"error": "Event not found"}, status=404)
        serializer = EventSerializer(event)
        return Response(serializer.data)
     
-    def patch(self, request, pk):
-            """
-            Update partial fields of an event (e.g., archive/unarchive).
-            """
-            event = self.get_object(pk)
-            if not event:
-                return Response({"error": "Event not found"}, status=404)
-
-            is_archived = request.data.get("is_archived", None)
-            if is_archived is not None:
-                event.is_archived = bool(is_archived)
-                event.save()
-                return Response({"message": "Event updated successfully"})
-
-            return Response({"error": "No valid fields to update"}, status=400)
 
     """
     Update an event instance.
@@ -339,6 +417,8 @@ class UserEventsView(APIView):
             )
 
 class TalentView(APIView):
+    permission_classes = [AllowAny]
+    
     def get(self,request):
         talents = Talent.objects.all()
         serializer = TalentSerializer(talents, many=True)
@@ -354,6 +434,7 @@ class TalentView(APIView):
 
 
 class TalentDetailView(APIView):
+    permission_classes = [AllowAny]
     
     def get_object(self,pk):
         try:
@@ -408,7 +489,8 @@ def generate_rdv_slots(start_time, end_time, recruiters_count, rdv_duration_minu
     
 
 class ParticipationView(APIView):
-    
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         """
         List all participations.
@@ -422,25 +504,75 @@ class ParticipationView(APIView):
         talent_id = request.data.get('talent_id')
         event_id = request.data.get('event_id')
         
+        if not event_id:
+            return Response({'error': 'Event ID is required'}, status=400)
+        
         try:
             event = Event.objects.get(id=event_id)
         except Event.DoesNotExist:
             return Response({'error': 'Event not found'}, status=404)
 
-        # Case 1: Existing talent
-        if talent_id:
+        # Case 1: Authenticated talent registering themselves
+        if request.user.role == 'talent' and not talent_id:
+            # Get or create talent profile for the authenticated user
+            talent, created = Talent.objects.get_or_create(
+                user_id=request.user,
+                defaults={
+                    'first_name': request.user.first_name,
+                    'last_name': request.user.last_name,
+                    'email': request.user.email,
+                    'phone': request.user.phone,
+                    'etablissement': getattr(request.user, 'etablissement', None),
+                    'filiere': getattr(request.user, 'filiere', None),
+                }
+            )
+            
+            # If talent already exists but some fields are missing, update them
+            if not created:
+                updated = False
+                if not talent.phone and request.user.phone:
+                    talent.phone = request.user.phone
+                    updated = True
+                if not talent.etablissement and hasattr(request.user, 'etablissement'):
+                    talent.etablissement = request.user.etablissement  
+                    updated = True
+                if not talent.filiere and hasattr(request.user, 'filiere'):
+                    talent.filiere = request.user.filiere
+                    updated = True
+                if updated:
+                    talent.save()
+            
+            # If talent already exists but some fields are empty, update them from user profile
+            if not created:
+                updated = False
+                if not talent.etablissement and hasattr(request.user, 'talent_profile') and request.user.talent_profile.etablissement:
+                    talent.etablissement = request.user.talent_profile.etablissement
+                    updated = True
+                if not talent.filiere and hasattr(request.user, 'talent_profile') and request.user.talent_profile.filiere:
+                    talent.filiere = request.user.talent_profile.filiere
+                    updated = True
+                if updated:
+                    talent.save()
+            
+            print(f"DEBUG: Talent profile for user {request.user}: {talent} (created: {created})")
+        # Case 2: Using provided talent_id (for recruiters or specific talent ID)
+        elif talent_id:
             try:
                 talent = Talent.objects.get(id=talent_id)
             except Talent.DoesNotExist:
                 return Response({'error': 'Talent not found'}, status=404)
-        # Case 2: New talent
+        # Case 3: New talent registration (with talent data provided)
         else:
             talent_serializer = TalentSerializer(data=request.data)
             if not talent_serializer.is_valid():
                 return Response(talent_serializer.errors, status=400)
             talent = talent_serializer.save()
 
-        if Participation.objects.filter(talent_id=talent, event_id=event).exists():
+        print(f"DEBUG: Checking existing participation for talent {talent} and event {event}")
+        existing_participation = Participation.objects.filter(talent_id=talent, event_id=event).first()
+        print(f"DEBUG: Existing participation found: {existing_participation}")
+        
+        if existing_participation:
             return Response({'error': 'Already registered for this event'}, status=400)
 
         participation_data = {
@@ -489,8 +621,14 @@ class ParticipationView(APIView):
                 'rdv': available_slot['start'],
                 'event_time_slot': time_slot
             })
-
-        participation = Participation.objects.create(**participation_data)
+        
+        try:
+            print(f"DEBUG: Creating participation with data: {participation_data}")
+            participation = Participation.objects.create(**participation_data)
+            print(f"DEBUG: Successfully created participation: {participation}")
+        except Exception as e:
+            print(f"DEBUG: Error creating participation: {e}")
+            return Response({'error': f'Error creating participation: {str(e)}'}, status=400)
         # Send confirmation email
         subject = "Confirmation de votre inscription à l'événement"
 
@@ -521,7 +659,7 @@ class ParticipationView(APIView):
                             <tr>
                                 <td style="padding: 40px 30px;">
                                     <h2 style="color: #333333; margin: 0 0 20px 0; font-size: 20px;">
-                                        Bonjour {talent.name},
+                                        Bonjour {talent.first_name} {talent.last_name},
                                     </h2>
                                     
                                     <p style="color: #555555; line-height: 1.6; margin: 0 0 20px 0; font-size: 16px;">
@@ -623,7 +761,7 @@ class ParticipationView(APIView):
 
         # Plain text fallback
         plain_message = f"""
-        Bonjour {talent.name},
+        Bonjour {talent.first_name} {talent.last_name},
 
         Félicitations ! Vous avez été inscrit avec succès à l'événement suivant :
 
@@ -671,6 +809,8 @@ class ParticipationView(APIView):
 
     
 class ParticipationDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    
     def get(self, request):
         """
         Retrieve a participation instance by event_id and talent_id from query params.
@@ -679,21 +819,46 @@ class ParticipationDetailView(APIView):
         event_id = request.query_params.get('event_id')
         talent_id = request.query_params.get('talent_id')
 
+
         if not event_id and not talent_id:
             return Response({'detail': 'please add at least one param'}, status=400)
+
+        # For talents, they can only check their own participations
+        if request.user.role == 'talent':
+            # If talent_id is provided, check if it matches their profile
+            if talent_id:
+                try:
+                    talent = Talent.objects.get(id=talent_id)
+                    if talent.user_id != request.user:
+                        return Response({'detail': 'You can only check your own participations'}, status=403)
+                except Talent.DoesNotExist:
+                    return Response({'detail': 'Talent not found'}, status=404)
+            else:
+                # If no talent_id provided, get talent by user
+                try:
+                    talent = Talent.objects.get(user_id=request.user)
+                    talent_id = talent.id
+                    print(f"DEBUG: Found talent profile for user {request.user}: talent_id={talent_id}")
+                except Talent.DoesNotExist:
+                    print(f"DEBUG: No talent profile found for user {request.user}")
+                    return Response({'detail': 'Talent profile not found'}, status=404)
 
         participation = None
         try:
             if event_id and talent_id:
                 participation = Participation.objects.filter(event_id=event_id, talent_id=talent_id).first()
+                print(f"DEBUG: Looking for participation with event_id={event_id}, talent_id={talent_id}")
+                print(f"DEBUG: Found participation: {participation.talent_id}")
             
             elif talent_id:
                 participation = Participation.objects.filter(talent_id=talent_id).first()
 
             if not participation:
+                print(f"DEBUG: No participation found")
                 return Response({'detail': 'Participation not found.'})
 
         except Exception as e:
+            print(f"DEBUG: Error finding participation: {e}")
             return Response({'detail': str(e)}, status=400)
 
         serializer = ParticipationSerializer(participation)
@@ -702,6 +867,8 @@ class ParticipationDetailView(APIView):
 
     
     def put(self,request):
+
+        
 
         event_id = request.query_params.get('event_id')
         talent_id = request.query_params.get('talent_id')
@@ -733,16 +900,18 @@ class ParticipationDetailView(APIView):
 
 class ParticipationsEventView(ListAPIView):
     serializer_class = ParticipationSerializer
+    permission_classes = [IsAuthenticated, IsRecruiter]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     
     # Define searchable fields
     search_fields = [
-        'talent_id__name',
-        'talent_id__email', 
-        'talent_id__etablissement',
-        'talent_id__filiere',
-        'talent_id__phone'
-    ]
+    'talent_id__first_name',
+    'talent_id__last_name',
+    'talent_id__email', 
+    'talent_id__etablissement',
+    'talent_id__filiere',
+    'talent_id__phone'
+]
     
     ordering = ['date_inscription']
 
@@ -759,6 +928,7 @@ class RDVReminderView(APIView):
     """
     API endpoint to send RDV reminders
     """
+    permission_classes = [IsAuthenticated, IsRecruiter]
     
     def post(self, request):
         """
@@ -860,7 +1030,7 @@ class RDVReminderView(APIView):
                                 <tr>
                                     <td style="padding: 40px 30px;">
                                         <h2 style="color: #333333; margin: 0 0 20px 0; font-size: 20px;">
-                                            Bonjour {talent.name},
+                                            Bonjour {talent.first_name} {talent.last_name},
                                         </h2>
                                         <p style="color: #555555; line-height: 1.6; margin: 0 0 20px 0; font-size: 16px;">
                                             Nous vous rappelons que vous avez un <strong>rendez-vous programmé</strong> dans <strong>{time_str}</strong>.
@@ -896,7 +1066,7 @@ class RDVReminderView(APIView):
             """
             
             plain_message = f"""
-            Bonjour {talent.name},
+            Bonjour {talent.first_name} {talent.last_name},
 
             Nous vous rappelons que vous avez un rendez-vous programmé dans {time_str}.
 
@@ -926,6 +1096,7 @@ class RDVReminderView(APIView):
 
 
 class TimeSlotView(APIView):
+    permission_classes = [IsAuthenticated, IsRecruiter]
 
     def get(self, request):
         """
@@ -963,6 +1134,7 @@ class TimeSlotView(APIView):
 
 class FileUploadView(APIView):
     parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, format=None):
         file_obj = request.FILES['file']
@@ -975,6 +1147,7 @@ class EventStatisticsView(APIView):
     """
     Get comprehensive statistics for a specific event
     """
+    permission_classes = [IsAuthenticated, IsRecruiter]
     
     def get(self, request, event_id):
         try:
@@ -1029,7 +1202,7 @@ class EventStatisticsView(APIView):
         
         # Top performing participants (highest rated)
         top_participants = participations.filter(note__gt=0).order_by('-note')[:5].values(
-            'talent_id__name', 'talent_id__email', 'note', 'is_selected'
+            'talent_id__first_name', 'talent_id__last_name', 'talent_id__email', 'note', 'is_selected'
         )
         
         # Historical comparison with previous events
@@ -1158,6 +1331,7 @@ class SendSelectionEmailView(APIView):
     """
     Send notification emails to selected talents for an event.
     """
+    permission_classes = [IsAuthenticated, IsRecruiter]
     
     def post(self, request, event_id):
         try:
@@ -1251,7 +1425,7 @@ class SendSelectionEmailView(APIView):
                     </div>
                     
                     <div class="content">
-                        <p>Bonjour <strong>{talent.name}</strong>,</p>
+                        <p>Bonjour <strong>{talent.first_name} {talent.last_name}</strong>,</p>
                         
                         <div class="highlight">
                             <p><strong>Excellente nouvelle !</strong> Suite à votre participation remarquée, nous avons le plaisir de vous inviter à un <strong>entretien approfondi</strong> dans le cadre de l'événement suivant :</p>
@@ -1323,4 +1497,3 @@ class SendSelectionEmailView(APIView):
             'failed': failed_emails,
             'total': len(talents)
         }, status=200)
-

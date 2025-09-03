@@ -4,24 +4,9 @@ import { Input } from "@heroui/input";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from "@heroui/modal";
 import { Bell, Send, AlertCircle, CheckCircle } from 'lucide-react';
+import { ReminderResult, RDVReminderComponentProps } from '@/types';
 
-interface ReminderResult {
-  message: string;
-  sent_count: number;
-  failed_count: number;
-  reminders_sent: Array<{
-    talent_name: string;
-    talent_email: string;
-    rdv_time: string;
-    event_title: string;
-  }>;
-}
-
-interface RDVReminderComponentProps {
-  eventId?: number; // Optional: if provided, will send reminders only for this event
-}
-
-const RDVReminderComponent: React.FC<RDVReminderComponentProps> = ({ eventId }) => {
+const RDVReminderComponent: React.FC<RDVReminderComponentProps> = ({ eventId, onClose: onCloseCallback }) => {
   const [hoursAhead, setHoursAhead] = useState(24);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ReminderResult | null>(null);
@@ -42,6 +27,7 @@ const RDVReminderComponent: React.FC<RDVReminderComponentProps> = ({ eventId }) 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
         body: JSON.stringify(requestBody)
       });
@@ -52,6 +38,7 @@ const RDVReminderComponent: React.FC<RDVReminderComponentProps> = ({ eventId }) 
     } catch (error) {
       console.error('Error sending reminders:', error);
       setResult({
+        success: false,
         message: 'Erreur lors de l\'envoi des rappels',
         sent_count: 0,
         failed_count: 1,
@@ -111,7 +98,7 @@ const RDVReminderComponent: React.FC<RDVReminderComponentProps> = ({ eventId }) 
             {result && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  {result.sent_count > 0 ? (
+                  {(result?.sent_count ?? 0) > 0 ? (
                     <CheckCircle className="text-green-500" size={20} />
                   ) : (
                     <AlertCircle className="text-orange-500" size={20} />
@@ -122,19 +109,19 @@ const RDVReminderComponent: React.FC<RDVReminderComponentProps> = ({ eventId }) 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-green-50 p-3 rounded-lg">
                     <p className="text-sm text-green-600">Rappels envoyés</p>
-                    <p className="text-2xl font-bold text-green-700">{result.sent_count}</p>
+                    <p className="text-2xl font-bold text-green-700">{result.sent_count ?? 0}</p>
                   </div>
                   <div className="bg-red-50 p-3 rounded-lg">
                     <p className="text-sm text-red-600">Échecs</p>
-                    <p className="text-2xl font-bold text-red-700">{result.failed_count}</p>
+                    <p className="text-2xl font-bold text-red-700">{result.failed_count ?? 0}</p>
                   </div>
                 </div>
 
-                {result.reminders_sent.length > 0 && (
+                {result?.reminders_sent && result.reminders_sent.length > 0 && (
                   <div>
                     <h4 className="font-medium mb-2">Rappels envoyés à:</h4>
                     <div className="max-h-60 overflow-y-auto space-y-2">
-                      {result.reminders_sent.map((reminder, index) => (
+                      {result?.reminders_sent.map((reminder, index) => (
                         <div key={index} className="bg-gray-50 p-3 rounded-lg text-sm">
                           <p className="font-medium">{reminder.talent_name}</p>
                           <p className="text-gray-600">{reminder.talent_email}</p>

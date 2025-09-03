@@ -1,27 +1,31 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useUser } from '../contexts/UserContext';
+import { SignupFormData } from '@/types';
 
-interface SignupFormData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-}
+// Note: You may need to adjust the SignupFormData interface in types/index.ts 
+// to match the field names used in this component (firstName vs first_name, etc.)
 
 const Signup: React.FC = () => {
+  const [currentStep, setCurrentStep] = useState<number>(1);
   const [formData, setFormData] = useState<SignupFormData>({
     firstName: '',
     lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
+    role: 'talent',
+    phone: '',
+    etablissement: '',
+    filiere: '',
   });
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
   const [signupSuccess, setSignupSuccess] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [signupLoading, setSignupLoading] = useState<boolean>(false);
+  const navigate = useNavigate();
+  const { login } = useUser();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -36,27 +40,40 @@ const Signup: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validation des mots de passe
-    if (formData.password !== formData.confirmPassword) {
-      setErrorMessage("Les mots de passe ne correspondent pas");
+    if (currentStep === 1) {
+      // Validation des mots de passe pour la première étape
+      if (formData.password !== formData.confirmPassword) {
+        setErrorMessage("Les mots de passe ne correspondent pas");
+        return;
+      }
+      
+      // Passer à l'étape 2
+      setCurrentStep(2);
+      setErrorMessage('');
       return;
     }
     
-    setIsLoading(true);
+    // Étape 2 - Soumission finale
+    setSignupLoading(true);
     setErrorMessage('');
 
     try {
       // Envoi de la requête à l'API locale
-      const response = await fetch('http://localhost:8000/signUp', {
+      const response = await fetch('http://localhost:8000/api/auth/register/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
           email: formData.email,
           password: formData.password,
+          password_confirm: formData.confirmPassword,
+          phone: formData.phone,
+          etablissement: formData.etablissement,
+          filiere: formData.filiere,
+          role: 'talent',
         }),
       });
 
@@ -66,6 +83,14 @@ const Signup: React.FC = () => {
         // Inscription réussie
         console.log('Inscription réussie:', data);
         setSignupSuccess(true);
+        
+        // Optionnel: Se connecter automatiquement après l'inscription
+        setTimeout(async () => {
+          const loginSuccess = await login(formData.email, formData.password);
+          if (loginSuccess) {
+            navigate('/dashboard'); // ou toute autre page
+          }
+        }, 2000);
       } else {
         // Gestion des erreurs de l'API
         setErrorMessage(data.message || 'Une erreur est survenue lors de l\'inscription');
@@ -74,8 +99,13 @@ const Signup: React.FC = () => {
       console.error('Erreur lors de l\'envoi de la requête:', error);
       setErrorMessage('Erreur de connexion au serveur. Veuillez réessayer.');
     } finally {
-      setIsLoading(false);
+      setSignupLoading(false);
     }
+  };
+
+  const handlePreviousStep = () => {
+    setCurrentStep(1);
+    setErrorMessage('');
   };
 
   // Styles sous forme d'objets TypeScript
@@ -225,6 +255,48 @@ const Signup: React.FC = () => {
       flex: '1 1 45%',
       minWidth: '150px',
     } as React.CSSProperties,
+    stepIndicator: {
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: '30px',
+      gap: '10px',
+    } as React.CSSProperties,
+    stepDot: {
+      width: '12px',
+      height: '12px',
+      borderRadius: '50%',
+      transition: 'all 0.3s ease',
+    } as React.CSSProperties,
+    stepDotActive: {
+      backgroundColor: '#4a6cf7',
+    } as React.CSSProperties,
+    stepDotInactive: {
+      backgroundColor: '#ddd',
+    } as React.CSSProperties,
+    stepLine: {
+      width: '40px',
+      height: '2px',
+      backgroundColor: '#ddd',
+    } as React.CSSProperties,
+    backButton: {
+      background: 'transparent',
+      color: '#4a6cf7',
+      border: '2px solid #4a6cf7',
+      padding: '12px 20px',
+      borderRadius: '8px',
+      fontSize: '14px',
+      fontWeight: 500,
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+      marginRight: '10px',
+    } as React.CSSProperties,
+    buttonContainer: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: '10px',
+    } as React.CSSProperties,
   };
 
   // Icône d'œil SVG pour afficher le mot de passe
@@ -306,6 +378,11 @@ const Signup: React.FC = () => {
             cursor: not-allowed;
           }
           
+          .back-button:hover {
+            background-color: #4a6cf7;
+            color: white;
+          }
+          
           a:hover {
             color: #3a56d5;
             text-decoration: underline;
@@ -327,19 +404,34 @@ const Signup: React.FC = () => {
       <div style={styles.card}>
         <div style={styles.header}>
           <h1 style={styles.title}>Créer un compte</h1>
-          <p style={styles.subtitle}>Rejoignez notre communauté</p>
+          <p style={styles.subtitle}>
+            {currentStep === 1 ? 'Informations de base' : 'Informations complémentaires'}
+          </p>
+          
+          {/* Step indicator */}
+          <div style={styles.stepIndicator}>
+            <div style={{
+              ...styles.stepDot,
+              ...(currentStep >= 1 ? styles.stepDotActive : styles.stepDotInactive)
+            }}></div>
+            <div style={styles.stepLine}></div>
+            <div style={{
+              ...styles.stepDot,
+              ...(currentStep >= 2 ? styles.stepDotActive : styles.stepDotInactive)
+            }}></div>
+          </div>
         </div>
 
         {signupSuccess ? (
           <div style={{ textAlign: 'center' }}>
             <div style={{...styles.message, ...styles.successMessage}}>
               <h3>Inscription réussie!</h3>
-              <p>Votre compte a été créé avec succès.</p>
+              <p>Votre compte a été créé avec succès. Vous allez être connecté automatiquement...</p>
             </div>
             <div style={{ marginTop: '20px' }}>
               <Link to="/login" style={styles.link}>
                 <button style={styles.signupButton}>
-                  Se connecter
+                  Se connecter manuellement
                 </button>
               </Link>
             </div>
@@ -347,103 +439,153 @@ const Signup: React.FC = () => {
         ) : (
           <>
             <form onSubmit={handleSubmit} style={styles.form}>
-              <div style={styles.nameRow} className="name-row">
-                <div style={styles.nameInputContainer}>
+              {currentStep === 1 ? (
+                <>
+                  {/* Step 1: Basic Information */}
+                  <div style={styles.nameRow} className="name-row">
+                    <div style={styles.nameInputContainer}>
+                      <div style={styles.inputGroup}>
+                        <label htmlFor="firstName" style={styles.label}>Prénom</label>
+                        <input
+                          type="text"
+                          id="firstName"
+                          name="firstName"
+                          value={formData.firstName}
+                          onChange={handleChange}
+                          placeholder="Votre prénom"
+                          required
+                          style={styles.input}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div style={styles.nameInputContainer}>
+                      <div style={styles.inputGroup}>
+                        <label htmlFor="lastName" style={styles.label}>Nom</label>
+                        <input
+                          type="text"
+                          id="lastName"
+                          name="lastName"
+                          value={formData.lastName}
+                          onChange={handleChange}
+                          placeholder="Votre nom"
+                          required
+                          style={styles.input}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div style={styles.inputGroup}>
-                    <label htmlFor="firstName" style={styles.label}>Prénom</label>
+                    <label htmlFor="email" style={styles.label}>Email</label>
                     <input
-                      type="text"
-                      id="firstName"
-                      name="firstName"
-                      value={formData.firstName}
+                      type="email"
+                      id="email"
+                      name="email"
+                      value={formData.email}
                       onChange={handleChange}
-                      placeholder="Votre prénom"
+                      placeholder="votre@email.com"
                       required
                       style={styles.input}
                     />
                   </div>
-                </div>
-                
-                <div style={styles.nameInputContainer}>
+
                   <div style={styles.inputGroup}>
-                    <label htmlFor="lastName" style={styles.label}>Nom</label>
+                    <label htmlFor="password" style={styles.label}>Mot de passe</label>
+                    <div style={styles.passwordContainer}>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        id="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        placeholder="Créez un mot de passe"
+                        required
+                        style={styles.input}
+                      />
+                      <button
+                        type="button"
+                        style={styles.eyeButton}
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="eye-button"
+                        tabIndex={-1}
+                      >
+                        <EyeIcon show={showPassword} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={styles.inputGroup}>
+                    <label htmlFor="confirmPassword" style={styles.label}>Confirmer le mot de passe</label>
+                    <div style={styles.passwordContainer}>
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
+                        placeholder="Confirmez votre mot de passe"
+                        required
+                        style={styles.input}
+                      />
+                      <button
+                        type="button"
+                        style={styles.eyeButton}
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="eye-button"
+                        tabIndex={-1}
+                      >
+                        <EyeIcon show={showConfirmPassword} />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Step 2: Additional Information */}
+                  <div style={styles.inputGroup}>
+                    <label htmlFor="phone" style={styles.label}>Numéro de téléphone</label>
                     <input
-                      type="text"
-                      id="lastName"
-                      name="lastName"
-                      value={formData.lastName}
+                      type="tel"
+                      id="phone"
+                      name="phone"
+                      value={formData.phone}
                       onChange={handleChange}
-                      placeholder="Votre nom"
+                      placeholder="Votre numéro de téléphone"
                       required
                       style={styles.input}
                     />
                   </div>
-                </div>
-              </div>
 
-              <div style={styles.inputGroup}>
-                <label htmlFor="email" style={styles.label}>Email</label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="votre@email.com"
-                  required
-                  style={styles.input}
-                />
-              </div>
+                  <div style={styles.inputGroup}>
+                    <label htmlFor="etablissement" style={styles.label}>Établissement</label>
+                    <input
+                      type="text"
+                      id="etablissement"
+                      name="etablissement"
+                      value={formData.etablissement}
+                      onChange={handleChange}
+                      placeholder="Votre établissement"
+                      required
+                      style={styles.input}
+                    />
+                  </div>
 
-              <div style={styles.inputGroup}>
-                <label htmlFor="password" style={styles.label}>Mot de passe</label>
-                <div style={styles.passwordContainer}>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    id="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="Créez un mot de passe"
-                    required
-                    style={styles.input}
-                  />
-                  <button
-                    type="button"
-                    style={styles.eyeButton}
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="eye-button"
-                    tabIndex={-1}
-                  >
-                    <EyeIcon show={showPassword} />
-                  </button>
-                </div>
-              </div>
-
-              <div style={styles.inputGroup}>
-                <label htmlFor="confirmPassword" style={styles.label}>Confirmer le mot de passe</label>
-                <div style={styles.passwordContainer}>
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    placeholder="Confirmez votre mot de passe"
-                    required
-                    style={styles.input}
-                  />
-                  <button
-                    type="button"
-                    style={styles.eyeButton}
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="eye-button"
-                    tabIndex={-1}
-                  >
-                    <EyeIcon show={showConfirmPassword} />
-                  </button>
-                </div>
-              </div>
+                  <div style={styles.inputGroup}>
+                    <label htmlFor="filiere" style={styles.label}>Filière</label>
+                    <input
+                      type="text"
+                      id="filiere"
+                      name="filiere"
+                      value={formData.filiere}
+                      onChange={handleChange}
+                      placeholder="Votre filière d'études"
+                      required
+                      style={styles.input}
+                    />
+                  </div>
+                </>
+              )}
 
               {errorMessage && (
                 <div style={{...styles.message, ...styles.errorMessage}}>
@@ -451,17 +593,33 @@ const Signup: React.FC = () => {
                 </div>
               )}
 
-              <button 
-                type="submit" 
-                style={styles.signupButton}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <div style={styles.spinner}></div>
-                ) : (
-                  "Créer mon compte"
+              <div style={styles.buttonContainer}>
+                {currentStep === 2 && (
+                  <button 
+                    type="button"
+                    style={styles.backButton}
+                    onClick={handlePreviousStep}
+                    className="back-button"
+                  >
+                    Retour
+                  </button>
                 )}
-              </button>
+                
+                <button 
+                  type="submit" 
+                  style={{
+                    ...styles.signupButton,
+                    ...(currentStep === 2 ? { flex: 1 } : { width: '100%' })
+                  }}
+                  disabled={signupLoading}
+                >
+                  {signupLoading ? (
+                    <div style={styles.spinner}></div>
+                  ) : (
+                    currentStep === 1 ? "Continuer" : "Créer mon compte"
+                  )}
+                </button>
+              </div>
             </form>
 
             <div style={styles.footer}>

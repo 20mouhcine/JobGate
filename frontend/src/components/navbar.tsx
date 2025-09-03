@@ -24,21 +24,7 @@ const NavBar = () => {
         {/* Desktop Nav */}
         <nav className="hidden md:flex ml-6">
           <ul className="flex space-x-4">
-            <li>
-              <Link to={'/'} className="text-gray-700 hover:text-blue-500">
-                Tableau de bord
-              </Link>
-            </li>
-            <li>
-              <a href="#" className="text-gray-700 hover:text-blue-500">
-                Créer une offre
-              </a>
-            </li>
-            <li>
-              <a href="#" className="text-gray-700 hover:text-blue-500">
-                Gérer une offre
-              </a>
-            </li>
+          
             <li>
               <Link
                 to="/events"

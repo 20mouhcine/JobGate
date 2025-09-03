@@ -1,22 +1,20 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-
-interface LoginFormData {
-  email: string;
-  password: string;
-}
+import { useUser } from '../contexts/UserContext';
+import { LoginFormData } from '@/types';
 
 const Login: React.FC = () => {
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
     password: ''
   });
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [forgotPassword, setForgotPassword] = useState<boolean>(false);
   const [resetEmailSent, setResetEmailSent] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState<boolean>(false);
   const navigate = useNavigate();
+  const { login, isLoading } = useUser();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -30,44 +28,20 @@ const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setErrorMessage('');
 
     try {
-      // Envoi de la requête à l'API locale pour la connexion
-      const response = await fetch('http://localhost:8000/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Connexion réussie
-        console.log('Connexion réussie:', data);
-        
-        // Stocker le token si présent dans la réponse
-        if (data.token) {
-          localStorage.setItem('authToken', data.token);
-        }
-        
-        // Rediriger vers la page d'accueil ou dashboard
-        navigate('/dashboard');
+      const success = await login(formData.email, formData.password);
+      
+      if (success) {
+        // Connexion réussie - rediriger vers la page précédente ou dashboard
+        navigate(-1);
       } else {
-        // Gestion des erreurs de l'API
-        setErrorMessage(data.message || 'Email ou mot de passe incorrect');
+        setErrorMessage('Email ou mot de passe incorrect');
       }
     } catch (error) {
       console.error('Erreur lors de la connexion:', error);
       setErrorMessage('Erreur de connexion au serveur. Veuillez réessayer.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -78,7 +52,7 @@ const Login: React.FC = () => {
       return;
     }
 
-    setIsLoading(true);
+    setForgotPasswordLoading(true);
     setErrorMessage('');
 
     try {
@@ -113,7 +87,7 @@ const Login: React.FC = () => {
       console.error("Erreur lors de l'envoi de la requête:", error);
       setErrorMessage('Erreur de connexion au serveur. Veuillez réessayer.');
     } finally {
-      setIsLoading(false);
+      setForgotPasswordLoading(false);
     }
   };
 
@@ -345,9 +319,9 @@ const Login: React.FC = () => {
             <button
               type="submit"
               style={styles.loginButton}
-              disabled={isLoading}
+              disabled={forgotPasswordLoading}
             >
-              {isLoading ? (
+              {forgotPasswordLoading ? (
                 <div style={styles.spinner}></div>
               ) : (
                 "Envoyer le lien de réinitialisation"
@@ -361,7 +335,7 @@ const Login: React.FC = () => {
                 setForgotPassword(false);
                 setErrorMessage('');
               }}
-              disabled={isLoading}
+              disabled={forgotPasswordLoading}
             >
               Retour à la connexion
             </button>

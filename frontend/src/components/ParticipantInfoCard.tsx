@@ -2,35 +2,9 @@ import React from 'react'
 import { Card, CardBody } from "@heroui/card";
 import { Avatar } from "@heroui/avatar";
 import{Mail,Phone,MapPin,Clock,Calendar} from 'lucide-react'
+import { Participation, ParticipantInfoCardProps } from '@/types';
 
-interface Talent {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  resume?: string;
-  etablissement?: string;
-  filiere?: string;
-  avatar?: string;
-  location?: string;
-}
-
-interface Participation {
-  id: number;
-  talent_id: Talent;
-  has_attended: boolean;
-  date_inscription: string;
-  note: number;
-  comment: string;
-  rdv: Date;
-  is_selected: boolean;
-  event_time_slot: {
-    start_time: string;
-    end_time: string;
-  } | null;
-}
-
-const ParticipantInfoCard = ({ participant }:{participant: Participation}) => {
+const ParticipantInfoCard = ({ participant }: ParticipantInfoCardProps) => {
       const getInitials = (name: string) => {
         return name
           .split(" ")
@@ -109,7 +83,7 @@ const InfoCard = ({ icon: Icon, title, value, color }: {
                   <div className="flex flex-col md:flex-row items-start gap-6">
                     <Avatar
                       src={participant.talent_id.avatar}
-                      name={getInitials(participant.talent_id.name)}
+                      name={getInitials(participant.talent_id.first_name + " " + participant.talent_id.last_name)}
                       size="lg"
                       className="text-lg font-bold flex-shrink-0"
                     />
@@ -119,20 +93,7 @@ const InfoCard = ({ icon: Icon, title, value, color }: {
                         {/* Left side: Participant Info */}
                         <div className="flex-1 min-w-0">
                           <h1 className="text-2xl font-bold text-gray-900 mb-2 truncate">
-                            {participant.talent_id.name
-                              .split(" ")[0]
-                              .charAt(0)
-                              .toUpperCase() +
-                              participant.talent_id.name
-                                .split(" ")[0]
-                                .slice(1)}{" "}
-                            {participant.talent_id.name.split(" ")[1]
-                              ? participant.talent_id.name
-                                  .split(" ")[1]
-                                  .charAt(0)
-                                  .toUpperCase() +
-                                participant.talent_id.name.split(" ")[1].slice(1)
-                              : ""}
+                            {participant.talent_id.first_name} {participant.talent_id.last_name}
                           </h1>
                           <div className="flex flex-col gap-2 text-sm text-gray-600 mb-4">
                             <div className="flex items-center gap-2">
