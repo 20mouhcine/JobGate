@@ -53,3 +53,11 @@ class TimeSlotSerializer(serializers.ModelSerializer):
         self.Meta.depth = 1  
         
         return result
+class UserEventsSerializer(serializers.ModelSerializer):
+    event = EventSerializer(read_only=True)
+    talent = TalentSerializer(read_only=True)
+    
+    class Meta:
+        model = Participation
+        fields = ['id', 'event', 'talent', 'has_attended', 'date_inscription', 
+                 'is_selected', 'rdv', 'event_time_slot']

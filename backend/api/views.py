@@ -1,6 +1,6 @@
 from rest_framework.views import APIView
 from .models import Event, Talent, Participation, TimeSlot
-from .serializers import EventSerializer, TalentSerializer, ParticipationSerializer,TimeSlotSerializer
+from .serializers import EventSerializer, TalentSerializer, ParticipationSerializer,TimeSlotSerializer,UserEventsSerializer
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.files.storage import default_storage
@@ -270,7 +270,74 @@ class EventDetailView(APIView):
                 status=404
             )
 
+from django.contrib.auth.models import User
+from rest_framework import status
+
+class UserEventsView(APIView):
+    """
+    Vue pour récupérer tous les événements auxquels un utilisateur spécifique a participé
+    """
     
+    def get(self, request, user_id):
+        try:
+            # Vérifier si c'est l'utilisateur mock (ID 13)
+            if user_id == 13:
+                # Retourner des événements mockés pour le développement
+                mock_events = [
+                    {
+                        "id": 1,
+                        "title": "Forum des Métiers de l'Informatique",
+                        "date": "15 Oct 2023",
+                        "location": "Campus Principal",
+                        "description": "Rencontre avec des professionnels du secteur IT",
+                        "type": "conférence"
+                    },
+                    {
+                        "id": 2,
+                        "title": "Atelier Développement Web",
+                        "date": "22 Oct 2023",
+                        "location": "Salle Multimedia",
+                        "description": "Apprentissage des technologies modernes front-end",
+                        "type": "atelier"
+                    }
+                ]
+                return Response(mock_events, status=status.HTTP_200_OK)
+            
+            # Récupérer l'utilisateur réel
+            user = User.objects.get(id=user_id)
+            
+            # Trouver le talent associé à cet utilisateur
+            try:
+                talent = Talent.objects.get(email=user.email)
+            except Talent.DoesNotExist:
+                return Response(
+                    {"error": "Aucun talent trouvé pour cet utilisateur"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Récupérer toutes les participations de cet utilisateur
+            participations = Participation.objects.filter(talent_id=talent.id)
+            
+            # Transformer les participations en format d'événement attendu par le frontend
+            events = []
+            for participation in participations:
+                event = participation.event_id
+                events.append({
+                    "id": event.id,
+                    "title": event.title,
+                    "date": event.start_date.strftime("%d %b %Y"),
+                    "location": event.location,
+                    "description": event.description or "Aucune description",
+                })
+            
+            return Response(events, status=status.HTTP_200_OK)
+            
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Utilisateur non trouvé"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
 class TalentView(APIView):
     def get(self,request):
         talents = Talent.objects.all()

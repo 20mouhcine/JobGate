@@ -53,8 +53,9 @@ const NavBar = () => {
 
       {/* User Icon */}
       <div className="hidden sm:flex sm:items-center">
-        <User className="cursor-pointer hover:text-blue-500 bg-gray-100 rounded-full" />
-        
+        <Link to="/profile">
+          <User className="cursor-pointer hover:text-blue-500 bg-gray-100 rounded-full" />
+        </Link>
       </div>
 
       {/* Mobile Sidebar */}
