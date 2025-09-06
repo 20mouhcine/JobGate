@@ -88,7 +88,7 @@ const Signup: React.FC = () => {
         setTimeout(async () => {
           const loginSuccess = await login(formData.email, formData.password);
           if (loginSuccess) {
-            navigate('/dashboard'); // ou toute autre page
+            navigate('/events'); // ou toute autre page
           }
         }, 2000);
       } else {

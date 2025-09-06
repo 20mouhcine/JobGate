@@ -1,34 +1,85 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Logo from "../../public/logo.svg";
-import { User, Menu, X } from "lucide-react";
-import { Link } from "react-router-dom";
+import { User, Menu, X, LogOut } from "lucide-react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useUser } from "@/contexts/UserContext";
 
 const NavBar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { user, logout } = useUser();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+    setDropdownOpen(false);
+    setMenuOpen(false);
+  };
+
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+  };
+
+  const toggleDropdown = () => {
+    setDropdownOpen(!dropdownOpen);
+  };
+
+  // Function to get the avatar URL with proper formatting
+  const getAvatarUrl = (avatarPath: string | undefined) => {
+    if (!avatarPath) return null;
+    
+    // If it's already a full URL, return as is
+    if (avatarPath.startsWith('http')) return avatarPath;
+    
+    // Otherwise, prepend the server URL
+    return `http://localhost:8000${avatarPath}`;
+  };
+
+  // Check if a path is active
+  const isActive = (path: string) => {
+    return location.pathname === path;
+  };
 
   return (
-    <div className="fixed top-0 left-0 w-full flex justify-between items-center p-6 shadow-lg z-50 bg-white overflow-hidden">
-      <div className="flex items-center space-x-6">
-        {/* Mobile Menu Button - Left of Logo */}
+    <div className="fixed top-0 left-0 w-full flex justify-between items-center p-4 shadow-lg z-50 bg-white">
+      <div className="flex items-center space-x-4">
+        {/* Mobile Menu Button */}
         <button
           className="md:hidden p-2 hover:bg-gray-100 rounded-md"
           onClick={() => setMenuOpen(!menuOpen)}
           aria-label="Toggle menu"
         >
-          {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
 
-        <img src={Logo} alt="Logo" className="h-auto" />
+        <img src={Logo} alt="Logo" className="h-8" />
 
         {/* Desktop Nav */}
-        <nav className="hidden md:flex ml-6">
+        <nav className="hidden md:flex ml-4">
           <ul className="flex space-x-4">
-          
             <li>
               <Link
                 to="/events"
-                className="text-blue-700 hover:text-blue-500 p-2 rounded transition-colors underline-dot"
+                className={`text-blue-700 hover:text-blue-500 p-2 rounded transition-colors ${
+                  isActive("/events") ? "underline-dot" : ""
+                }`}
               >
                 Événements
               </Link>
@@ -37,11 +88,65 @@ const NavBar = () => {
         </nav>
       </div>
 
-      {/* User Icon */}
-      <div className="hidden sm:flex sm:items-center">
-        <Link to="/profile">
-          <User className="cursor-pointer hover:text-blue-500 bg-gray-100 rounded-full" />
-        </Link>
+      {/* User Icon with Dropdown */}
+      <div className="flex items-center relative" ref={dropdownRef}>
+        <button
+          onClick={toggleDropdown}
+          className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors overflow-hidden"
+        >
+          {user?.avatar ? (
+            <img
+              src={getAvatarUrl(user.avatar)}
+              alt={`${user.first_name} ${user.last_name}`}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // If image fails to load, show initials instead
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : null}
+          
+          {(!user?.avatar || !user.avatar) && user?.first_name && user?.last_name ? (
+            <span className="font-semibold">
+              {getInitials(user.first_name, user.last_name)}
+            </span>
+          ) : (
+            <User className="w-5 h-5" />
+          )}
+        </button>
+
+        {/* Dropdown Menu */}
+        {dropdownOpen && (
+          <div className="absolute top-12 right-0 w-48 bg-white rounded-lg shadow-lg py-2 z-50 border border-gray-200">
+            <div className="px-4 py-2 border-b border-gray-100">
+              <p className="text-sm font-medium text-gray-900">
+                {user?.first_name} {user?.last_name}
+              </p>
+              <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+            </div>
+            
+            <Link
+              to="/profile"
+              className={`flex items-center px-4 py-2 text-sm ${
+                isActive("/profile") 
+                  ? "bg-blue-100 text-blue-700" 
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
+              onClick={() => setDropdownOpen(false)}
+            >
+              <User className="w-4 h-4 mr-2" />
+              Mon Profil
+            </Link>
+            
+            <button
+              onClick={handleLogout}
+              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Déconnexion
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Mobile Sidebar */}
@@ -49,44 +154,68 @@ const NavBar = () => {
         <>
           {/* Overlay */}
           <div
-            className="fixed inset-0 bg-opacity-50 z-40 md:hidden"
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
             onClick={() => setMenuOpen(false)}
           ></div>
 
           {/* Sidebar */}
-          <div className="fixed top-0 left-0 h-full  bg-white shadow-xl z-50 md:hidden transform transition-transform duration-300 ease-in-out w-auto">
+          <div className="fixed top-0 left-0 h-full w-64 bg-white shadow-xl z-50 md:hidden transform transition-transform duration-300 ease-in-out">
             <div className="flex flex-col h-full">
               {/* Sidebar Header */}
-              <div className="flex items-center justify-end">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                <img src={Logo} alt="Logo" className="h-8" />
                 <button
                   onClick={() => setMenuOpen(false)}
                   className="p-2 hover:bg-gray-100 rounded-md"
                   aria-label="Close menu"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* User Profile Section */}
-              <div className="flex items-center p-2 bg-gray-50">
+              <div className="flex items-center p-4 bg-gray-50 border-b border-gray-200">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                    <User className=" w-6 h-6 text-white" />
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden bg-blue-100 text-blue-700">
+                    {user?.avatar ? (
+                      <img
+                        src={getAvatarUrl(user.avatar)}
+                        alt={`${user.first_name} ${user.last_name}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : null}
+                    
+                    {(!user?.avatar || !user.avatar) && user?.first_name && user?.last_name ? (
+                      <span className="font-semibold">
+                        {getInitials(user.first_name, user.last_name)}
+                      </span>
+                    ) : (
+                      <User className="w-5 h-5" />
+                    )}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">Utilisateur</p>
-                    <p className="text-sm text-gray-500">user@example.com</p>
+                    <p className="font-medium text-gray-900">
+                      {user?.first_name} {user?.last_name}
+                    </p>
+                    <p className="text-sm text-gray-500 truncate">{user?.email}</p>
                   </div>
                 </div>
               </div>
 
               {/* Navigation */}
-              <nav className="flex-1 py-5  w-full">
-                <ul className="space-y-1 ">
+              <nav className="flex-1 py-4">
+                <ul className="space-y-1">
                   <li>
-                    <a
-                      href="#"
-                      className="w-full flex items-center justify-start space-x-3 text-gray-700 hover:text-blue-500 hover:bg-blue-50 p-3 rounded-lg transition-colors"
+                    <Link
+                      to="/dashboard"
+                      className={`flex items-center space-x-3 p-3 rounded-lg transition-colors ${
+                        isActive("/dashboard")
+                          ? "bg-blue-100 text-blue-700"
+                          : "text-gray-700 hover:text-blue-500 hover:bg-blue-50"
+                      }`}
                       onClick={() => setMenuOpen(false)}
                     >
                       <svg
@@ -109,7 +238,7 @@ const NavBar = () => {
                         />
                       </svg>
                       <span>Tableau de bord</span>
-                    </a>
+                    </Link>
                   </li>
                   <li>
                     <a
@@ -149,7 +278,7 @@ const NavBar = () => {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           strokeWidth={2}
-                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 极速3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 极速00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.极速a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
                         />
                         <path
                           strokeLinecap="round"
@@ -164,14 +293,18 @@ const NavBar = () => {
                   <li>
                     <Link
                       to="/events"
-                      className="flex items-center space-x-3 text-gray-700 hover:text-blue-500 hover:bg-blue-50 p-3 rounded-lg transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-lg transition-colors ${
+                        isActive("/events")
+                          ? "bg-blue-100 text-blue-700"
+                          : "text-gray-700 hover:text-blue-500 hover:bg-blue-50"
+                      }`}
                       onClick={() => setMenuOpen(false)}
                     >
                       <svg
                         className="w-5 h-5"
                         fill="none"
                         stroke="currentColor"
-                        viewBox="0 0 24 24"
+                        viewBox="极速 24"
                       >
                         <path
                           strokeLinecap="round"
@@ -180,28 +313,19 @@ const NavBar = () => {
                           d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4M8 7v8a2 2 0 002 2h4a2 2 0 002-2V7M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V9a2 2 0 00-2-2h-2"
                         />
                       </svg>
-                      <span>événement</span>
+                      <span>Événements</span>
                     </Link>
                   </li>
                 </ul>
               </nav>
 
               {/* Sidebar Footer */}
-              <div className="p-2">
-                <button className="w-full flex items-center justify-start space-x-2 text-gray-600 hover:text-red-500 p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                    />
-                  </svg>
+              <div className="p-4 border-t border-gray-200">
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center justify-center space-x-2 text-gray-600 hover:text-red-500 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
                   <span>Déconnexion</span>
                 </button>
               </div>
@@ -209,6 +333,31 @@ const NavBar = () => {
           </div>
         </>
       )}
+
+      {/* Add CSS for the underline-dot effect */}
+      <style>
+        {`
+          .underline-dot {
+            position: relative;
+          }
+          
+          .underline-dot::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 6px;
+            height: 6px;
+            background-color: #3b82f6;
+            border-radius: 50%;
+          }
+          
+          .underline-dot:hover::after {
+            background-color: #60a5fa;
+          }
+        `}
+      </style>
     </div>
   );
 };

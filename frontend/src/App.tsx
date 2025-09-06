@@ -8,20 +8,25 @@ import Signup from "@/pages/SignUp";
 import Login from "@/pages/Login";
 import PrivateRoute from "@/components/PrivateRoute";
 import Profile from "./pages/Profile";
+import path from "path";
 function App() {
-  
+
   return (
     <Routes>
+      <Route element={<Signup />} path="/signup" />
+      <Route element={<Login />} path="/login" />
+
+      
       <Route element={<EventsPage />} path="/events" />
       <Route element={<EventDetailsPage />} path="/events/:id" />
-        <Route element={<Signup />} path="/signup" />
-        <Route element={<Login />} path="/login" />
+
+      <Route element={<Profile />} path="/profile" />
       <Route element={<PrivateRoute />}>
         <Route
-          element={<ParticipantDetailsPage  />}
+          element={<ParticipantDetailsPage />}
           path="/events/:eventId/participants/:talentId"
         />
-        </Route>
+      </Route>
 
     </Routes>
   );

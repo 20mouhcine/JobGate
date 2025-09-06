@@ -18,7 +18,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated, BasePermission
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-
+from django.contrib.auth import get_user_model
 
 # Custom Permissions
 class IsRecruiter(BasePermission):
@@ -80,13 +80,32 @@ class UserProfileView(APIView):
 
     def put(self, request):
         if request.user.role == "talent":
-            serializer = TalentSerializer(request.user.talent_profile, data=request.data, partial=True)
+            # Update the Talent model
+            talent_serializer = TalentSerializer(request.user.talent_profile, data=request.data, partial=True)
+            if talent_serializer.is_valid():
+                talent_serializer.save()
+                
+                # Also update the User model with the common fields
+                user_data = {
+                    'first_name': request.data.get('first_name', request.user.first_name),
+                    'last_name': request.data.get('last_name', request.user.last_name),
+                    'email': request.data.get('email', request.user.email),
+                    'phone': request.data.get('phone', request.user.phone),
+                }
+                user_serializer = UserSerializer(request.user, data=user_data, partial=True)
+                if user_serializer.is_valid():
+                    user_serializer.save()
+                
+                # Return the updated user data
+                return Response(UserSerializer(request.user).data)
+            return Response(talent_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         else:
+            # For recruiters, update the User model directly
             serializer = UserSerializer(request.user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LogoutView(APIView):
@@ -183,6 +202,21 @@ class EventDetailView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
     
+    def patch(self, request, pk):
+        """
+        Update partial fields of an event (e.g., archive/unarchive).
+        """
+        event = self.get_object(pk)
+        if not event:
+            return Response({"error": "Event not found"}, status=404)
+
+        is_archived = request.data.get("is_archived", None)
+        if is_archived is not None:
+            event.is_archived = bool(is_archived)
+            event.save()
+            return Response({"message": "Event updated successfully"})
+
+        return Response({"error": "No valid fields to update"}, status=400)
     """
     Delete an event instance.
     """
@@ -358,6 +392,8 @@ class UserEventsView(APIView):
     
     def get(self, request, user_id):
         try:
+            User = get_user_model()  # Utiliser get_user_model() pour obtenir le modèle User personnalisé
+            
             # Vérifier si c'est l'utilisateur mock (ID 13)
             if user_id == 13:
                 # Retourner des événements mockés pour le développement
@@ -386,7 +422,7 @@ class UserEventsView(APIView):
             
             # Trouver le talent associé à cet utilisateur
             try:
-                talent = Talent.objects.get(email=user.email)
+                talent = Talent.objects.get(user_id=user)  # Utiliser user_id au lieu de email
             except Talent.DoesNotExist:
                 return Response(
                     {"error": "Aucun talent trouvé pour cet utilisateur"},
@@ -1497,3 +1533,32 @@ class SendSelectionEmailView(APIView):
             'failed': failed_emails,
             'total': len(talents)
         }, status=200)
+
+
+# In your AvatarUploadView in views.py
+class AvatarUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        if 'avatar' not in request.FILES:
+            return Response({'error': 'No avatar file provided'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        avatar_file = request.FILES['avatar']
+        
+        # Validate file type
+        if not avatar_file.content_type.startswith('image/'):
+            return Response({'error': 'File must be an image'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate file size (max 5MB)
+        if avatar_file.size > 5 * 1024 * 1024:
+            return Response({'error': 'File size must be less than 5MB'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Save the avatar
+        user = request.user
+        user.avatar = avatar_file
+        user.save()
+        
+        # Return the absolute avatar URL
+        avatar_url = request.build_absolute_uri(user.avatar.url) if user.avatar else None
+        return Response({'avatar': avatar_url}, status=status.HTTP_200_OK)

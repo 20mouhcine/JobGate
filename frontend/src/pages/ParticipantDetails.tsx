@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { useParams, useNavigate } from "react-router-dom";
+import { Toaster } from 'react-hot-toast';
 import {
   Modal,
   ModalContent,
@@ -77,8 +78,8 @@ const StarRating = ({
             <Star
               size={size}
               className={`${star <= (hoverRating || rating)
-                  ? "text-yellow-400 fill-yellow-400"
-                  : "text-gray-300"
+                ? "text-yellow-400 fill-yellow-400"
+                : "text-gray-300"
                 } transition-colors duration-200`}
             />
           </button>
@@ -134,11 +135,11 @@ export default function ParticipantDetailsPage() {
     try {
       setLoading(true);
       const response = await fetch(
-        `${API_URL}participations-details/?event_id=${eventId}&talent_id=${talentId}`,{
-          headers: {
-            "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-          }
+        `${API_URL}participations-details/?event_id=${eventId}&talent_id=${talentId}`, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`
         }
+      }
       );
 
       if (!response.ok) {
@@ -170,7 +171,6 @@ export default function ParticipantDetailsPage() {
       fetchParticipant();
     }
   }, [fetchParticipant, eventId, talentId]);
-
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -202,7 +202,17 @@ export default function ParticipantDetailsPage() {
         talent_id: prev!.talent_id,
       }));
 
+      // Update the original data and reset dirty state
+      setOriginalData({
+        note: updatedData.note || 0,
+        comment: updatedData.comment || "",
+        has_attended: updatedData.has_attended || false,
+        is_selected: updatedData.is_selected || false,
+      });
+      setDirty(false);
+
       toast.success("Participant details updated successfully");
+      console.log('updated');
     } catch (error) {
       console.error("Error updating participation:", error);
       toast.error("Failed to update details");
@@ -480,6 +490,30 @@ export default function ParticipantDetailsPage() {
           </ModalContent>
         </Modal>
       </div>
+            <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: 'green',
+              secondary: 'white',
+            },
+          },
+          error: {
+            duration: 5000,
+            iconTheme: {
+              primary: 'red',
+              secondary: 'white',
+            },
+          },
+        }}
+      />
     </DefaultLayout>
   );
 }

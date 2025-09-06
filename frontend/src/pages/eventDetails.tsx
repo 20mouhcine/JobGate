@@ -39,6 +39,7 @@ import {
 } from "@heroui/table";
 
 import { Event, Talent, Participation } from '@/types';
+import toast, { Toaster } from "react-hot-toast";
 
 export default function EventDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -197,7 +198,7 @@ export default function EventDetailsPage() {
     if (!id) return;
 
     setIsLoadingParticipations(true);
-    if(user?.role === "talent") return;
+    if (user?.role === "talent") return;
     try {
       const params = new URLSearchParams();
       params.append("page", page.toString());
@@ -237,7 +238,7 @@ export default function EventDetailsPage() {
 
     const selectedTalents = participations.filter((p) => p.is_selected);
     if (selectedTalents.length === 0) {
-      alert("Aucun talent sélectionné trouvé.");
+      toast.error("Aucun talent sélectionné");
       return;
     }
 
@@ -257,9 +258,8 @@ export default function EventDetailsPage() {
       );
 
       if (response.ok) {
-        alert(
-          `Email envoyé avec succès à ${selectedTalents.length} talent(s) sélectionné(s)!`
-        );
+        toast.success(`Email envoyé avec succès à ${selectedTalents.length} talent(s) sélectionné(s)!`)
+
         setEmailSent(true); // Hide the button after successful send
       } else {
         const errorData = await response.json();
@@ -267,7 +267,7 @@ export default function EventDetailsPage() {
       }
     } catch (error) {
       console.error("Error sending email:", error);
-      alert("Erreur lors de l'envoi de l'email. Veuillez réessayer.");
+      toast.error("Erreur lors de l'envoi de l'email. Veuillez réessayer.");
     } finally {
       setIsLoadingEmail(false);
     }
@@ -310,7 +310,7 @@ export default function EventDetailsPage() {
       window.location.href = "/events";
     } catch (error) {
       console.error(error);
-      alert("Erreur lors du désarchivage de l'événement.");
+      toast.error("Erreur lors du désarchivage de l'événement.");
     }
   };
 
@@ -395,12 +395,12 @@ export default function EventDetailsPage() {
 
   const handleCvChange = async () => {
     if (!newCv) {
-      alert("Veuillez sélectionner un fichier CV avant d'importer.");
+      toast.error("Veuillez sélectionner un fichier CV avant d'importer.");
       return;
     }
 
     if (!user) {
-      alert("Erreur: utilisateur non connecté.");
+      toast.error("Erreur: utilisateur non connecté.");
       return;
     }
 
@@ -424,7 +424,7 @@ export default function EventDetailsPage() {
         throw new Error("Erreur lors de la mise à jour du CV");
       }
 
-      alert("CV importé avec succès !");
+      toast.success("CV importé avec succès !");
 
       // Then, register for the event participation
       const participationData: any = {
@@ -454,35 +454,35 @@ export default function EventDetailsPage() {
       }
 
       await participationResponse.json(); // Parse the response
-      alert("Inscription réussie !");
-      
+      toast.success("Inscription réussie !");
+
       // Update registration status
       setIsRegistered(true);
-      
+
       // Optionally refresh the page data
       if (user.role === "recruiter") {
         fetchParticipations();
       }
-      
+
     } catch (error) {
       console.error("Error updating CV or registering:", error);
-      alert(error instanceof Error ? error.message : "Erreur lors de la mise à jour du CV ou de l'inscription");
+      toast.error(error instanceof Error ? error.message : "Erreur lors de la mise à jour du CV ou de l'inscription");
     }
   };
   const handleRegistrationClick = () => {
     // Only allow registration for authenticated talents
     if (!user) {
-      alert("Veuillez vous connecter pour vous inscrire à cet événement.");
+      toast.error("Veuillez vous connecter pour vous inscrire à cet événement.");
       return;
     }
 
     if (user.role !== "talent") {
-      alert("Seuls les talents peuvent s'inscrire aux événements.");
+      toast.error("Seuls les talents peuvent s'inscrire aux événements.");
       return;
     }
 
     if (isRegistered) {
-      alert("Vous êtes déjà inscrit à cet événement.");
+      toast.error("Vous êtes déjà inscrit à cet événement.");
       return;
     }
 
@@ -527,16 +527,16 @@ export default function EventDetailsPage() {
       }
 
       onCloseConfirmModal();
-      alert("Inscription réussie avec votre CV actuel !");
+      toast.success("Inscription réussie avec votre CV actuel !");
       setIsRegistered(true);
     } catch (error) {
       console.error("Registration error:", error);
 
       // Show the actual error message to help with debugging
       if (error instanceof Error) {
-        alert(`Erreur lors de l'inscription: ${error.message}`);
+        toast.error(`Erreur lors de l'inscription: ${error.message}`);
       } else {
-        alert("Erreur lors de l'inscription");
+        toast.error("Erreur lors de l'inscription");
       }
     } finally {
       setIsLoadingRegistrations(false);
@@ -672,7 +672,7 @@ export default function EventDetailsPage() {
     setSearchQuery(event.target.value);
   };
 
-  
+
   const filteredParticipations = participations.filter((participation) => {
     // Apply selection filter
     if (selectedFilter === "selected" && !participation.is_selected) {
@@ -715,8 +715,8 @@ export default function EventDetailsPage() {
     switch (columnKey) {
       case "full_name":
         return <Link to={`participants/${item.talent_id}`}>{item.full_name}</Link>;
-        case "phone":
-          return <span>{item.phone || "-"}</span>
+      case "phone":
+        return <span>{item.phone || "-"}</span>
       case "filiere":
         return (
           <span className="max-w-xs truncate" title={item.filiere}>
@@ -1539,6 +1539,30 @@ export default function EventDetailsPage() {
           </ModalContent>
         </Modal>
       </div>
+            <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: 'green',
+              secondary: 'white',
+            },
+          },
+          error: {
+            duration: 5000,
+            iconTheme: {
+              primary: 'red',
+              secondary: 'white',
+            },
+          },
+        }}
+      />
     </DefaultLayout>
   );
 }
