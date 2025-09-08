@@ -3,8 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 import { SignupFormData } from '@/types';
 
-// Note: You may need to adjust the SignupFormData interface in types/index.ts 
-// to match the field names used in this component (firstName vs first_name, etc.)
+
 
 const Signup: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);

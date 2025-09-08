@@ -215,7 +215,7 @@ export default function ParticipantDetailsPage() {
       console.log('updated');
     } catch (error) {
       console.error("Error updating participation:", error);
-      toast.error("Failed to update details");
+      toast.error("Échec de la mise à jour des détails");
     } finally {
       setSaving(false);
     }
@@ -237,7 +237,7 @@ export default function ParticipantDetailsPage() {
         <div className="flex justify-center items-center h-screen">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading participant details...</p>
+            <p className="text-gray-600">Chargement des détails du participant...</p>
           </div>
         </div>
       </DefaultLayout>
@@ -250,18 +250,17 @@ export default function ParticipantDetailsPage() {
         <div className="text-center py-20">
           <AlertCircle className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Participant not found
+            Participant non trouvé
           </h3>
           <p className="text-gray-600 mb-6">
-            The participant you're looking for doesn't exist or may have been
-            removed.
+            Le participant que vous recherchez n'existe pas ou a peut-être été supprimé.
           </p>
           <Button
             color="primary"
             onPress={() => navigate(-1)}
             startContent={<Users size={16} />}
           >
-            Back to participants
+            Retour aux participants
           </Button>
         </div>
       </DefaultLayout>
@@ -281,12 +280,12 @@ export default function ParticipantDetailsPage() {
                 startContent={<Users size={16} />}
                 className="text-gray-600 hover:text-gray-900"
               >
-                Back
+                Retour
               </Button>
               {dirty && (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
                   <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                  Unsaved changes
+                  Modifications non enregistrées
                 </span>
               )}
             </div>
@@ -308,7 +307,7 @@ export default function ParticipantDetailsPage() {
                 color="success"
                 isDisabled={!dirty}
               >
-                {saving ? "Saving..." : "Save"}
+                {saving ? "Enregistrement..." : "Enregistrer"}
               </Button>
             </div>
           </div>
@@ -327,7 +326,7 @@ export default function ParticipantDetailsPage() {
                   <div className="flex justify-between items-center w-full">
                     <h3 className="text-lg font-semibold flex items-center gap-2">
                       <Eye size={20} />
-                      Resume Preview
+                      Aperçu du CV
                     </h3>
                     <Button
                       size="sm"
@@ -335,7 +334,7 @@ export default function ParticipantDetailsPage() {
                       onPress={onOpen}
                       endContent={<Eye size={14} />}
                     >
-                      Full Screen
+                      Plein Écran
                     </Button>
                   </div>
                 </CardHeader>
@@ -365,7 +364,7 @@ export default function ParticipantDetailsPage() {
                 <CardHeader className="pb-3">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Award size={20} />
-                    Evaluation & Rating
+                    Évaluation et Notation
                   </h3>
                 </CardHeader>
                 <CardBody className="space-y-6">
@@ -376,10 +375,10 @@ export default function ParticipantDetailsPage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Attendance
+                              Présence
                             </label>
                             <p className="text-xs text-gray-500">
-                              Mark as attended
+                              Marquer comme présent
                             </p>
                           </div>
                           <Switch
@@ -400,10 +399,10 @@ export default function ParticipantDetailsPage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Selection
+                              Sélection
                             </label>
                             <p className="text-xs text-gray-500">
-                              Mark as selected
+                              Marquer comme sélectionné
                             </p>
                           </div>
                           <Switch
@@ -439,7 +438,7 @@ export default function ParticipantDetailsPage() {
                     {/* Comments */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        General Comments
+                          Note Globale
                       </label>
                       <textarea
                         value={formData.comment}
@@ -450,7 +449,7 @@ export default function ParticipantDetailsPage() {
                           }));
                           setDirty(true);
                         }}
-                        placeholder="Add your evaluation comments..."
+                        placeholder="Ajoutez vos commentaires d'évaluation..."
                         rows={3}
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                       />
@@ -490,7 +489,7 @@ export default function ParticipantDetailsPage() {
           </ModalContent>
         </Modal>
       </div>
-            <Toaster 
+      <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,

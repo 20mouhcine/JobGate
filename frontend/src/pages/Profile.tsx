@@ -27,7 +27,8 @@ interface Event {
   location: string;
   description: string;
   type: 'conférence' | 'atelier' | 'réseautage' | 'formation';
-  recruiterId: number
+  recruiterId: number;
+  caption: string
 }
 
 const descriptionStyles = `
@@ -184,7 +185,10 @@ const styles = {
   avatarContainer: {
     position: 'relative',
     display: 'inline-block',
+    width: '100px',   // same as avatar
+    height: '100px',  // same as avatar
   } as React.CSSProperties,
+
   avatar: {
     width: '100px',
     height: '100px',
@@ -210,6 +214,7 @@ const styles = {
   } as React.CSSProperties,
   userInfo: {
     flex: 1,
+    marginLeft: '20px',  
   } as React.CSSProperties,
   infoGrid: {
     display: 'grid',
@@ -441,13 +446,12 @@ const Profile = () => {
                   title: event.title || "Sans titre",
                   date: event.date || event.start_date || "Date inconnue",
                   location: event.location || "Lieu inconnu",
-                  description: event.description || "Aucune description",
+                  caption: event.caption || "Aucune description",
                   type: event.type || "conférence"
                 }));
 
               setEvents(validEvents);
             } else {
-              console.error("Expected an array but got:", eventsData);
               setError("La réponse du serveur est inattendue.");
             }
           }
@@ -494,12 +498,10 @@ const Profile = () => {
 
               setEvents(validEvents);
             } else {
-              console.error("Expected an array but got:", eventsData);
               setError("La réponse du serveur est inattendue.");
             }
           }
         } catch (error) {
-          console.error("Error fetching events:", error);
           setError("Impossible de charger les événements. Veuillez réessayer plus tard.");
         } finally {
           setIsLoading(false);
@@ -539,20 +541,20 @@ const Profile = () => {
         }
 
         const updatedUserData = await response.json();
-        
+
         toast.success("Utilisateur modifié avec succès")
 
-        // Update the user context with the new data
+
         if (updateUser) {
           updateUser(updatedUserData);
         }
 
-        // Update the displayed user data
+
         setEditedUser(updatedUserData);
 
         setSuccess("Profil mis à jour avec succès!");
 
-        // Then handle avatar upload if a new one was selected
+
         if (avatarFile) {
           await handleAvatarUpload(avatarFile);
         }
@@ -689,32 +691,8 @@ const Profile = () => {
     }
   };
 
-  const renderDescription = (htmlContent: string) => {
-    if (!htmlContent) return null;
 
-    const cleanedContent = htmlContent
-      .replace(/<p><br><\/p>/g, "")
-      .replace(/<p>\s*<\/p>/g, "")
-      .trim();
 
-    if (!cleanedContent || cleanedContent === "<p></p>") {
-      return (
-        <p className="text-gray-500 italic">
-          Aucune description disponible pour cet événement.
-        </p>
-      );
-    }
-
-    return (
-      <>
-        <style dangerouslySetInnerHTML={{ __html: descriptionStyles }} />
-        <div
-          className="description-content text-gray-700 leading-relaxed"
-          dangerouslySetInnerHTML={{ __html: cleanedContent }}
-        />
-      </>
-    );
-  };
 
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -964,7 +942,7 @@ const Profile = () => {
                 <input
                   type="email"
                   name="email"
-                  value={editedUser.email}
+                  value={formData?.email}
                   onChange={handleChange}
                   style={styles.input}
                 />
@@ -979,7 +957,7 @@ const Profile = () => {
                 <input
                   type="text"
                   name="phone"
-                  value={editedUser.phone || ''}
+                  value={formData?.phone || ''}
                   onChange={handleChange}
                   style={styles.input}
                   placeholder="Ajouter un numéro de téléphone"
@@ -1073,35 +1051,35 @@ const Profile = () => {
             <div style={styles.eventsGrid}>
               {events.map(event => (
                 <Link to={`/events/${event?.id}`}>
-                                  <div
-                  key={event.id}
-                  style={{
-                    ...styles.eventCard,
-                    borderLeft: `4px solid ${getEventTypeColor(event.type)}`
-                  }}
-                  className="event-card"
-                >
-                  <h4 style={styles.eventTitle}>{event.title}</h4>
-                  <span style={styles.eventDate}>{event.date}</span>
-                  <div style={styles.eventDescription}>
-                    {renderDescription(event.description)}
+                  <div
+                    key={event.id}
+                    style={{
+                      ...styles.eventCard,
+                      borderLeft: `4px solid ${getEventTypeColor(event.type)}`
+                    }}
+                    className="event-card"
+                  >
+                    <h4 style={styles.eventTitle}>{event.title}</h4>
+                    <span style={styles.eventDate}>{event.date}</span>
+                    <div style={styles.eventDescription}>
+                      {event.caption}
+                    </div>
+                    <div style={styles.eventLocation}>
+                      <svg
+                        style={styles.icon}
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                      </svg>
+                      {event.location}
+                    </div>
                   </div>
-                  <div style={styles.eventLocation}>
-                    <svg
-                      style={styles.icon}
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                      <circle cx="12" cy="10" r="3"></circle>
-                    </svg>
-                    {event.location}
-                  </div>
-                </div>
                 </Link>
 
               ))}
@@ -1109,7 +1087,7 @@ const Profile = () => {
           )}
         </div>
       </div>
-            <Toaster
+      <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,

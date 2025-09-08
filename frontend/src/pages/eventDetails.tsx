@@ -347,7 +347,7 @@ export default function EventDetailsPage() {
         setEvent(data);
       } catch (error) {
         console.error("Error fetching event:", error);
-        setError("Failed to load event details. Please try again later.");
+        setError("Échec du chargement des détails de l'événement. Veuillez réessayer plus tard.");
       } finally {
         setIsLoading(false);
       }
@@ -642,7 +642,7 @@ export default function EventDetailsPage() {
       window.location.href = "/events";
     } catch (error) {
       console.error("Error cancelling event:", error);
-      setError("Failed to cancel the event. Please try again later.");
+      setError("Échec de l'annulation de l'événement. Veuillez réessayer plus tard.");
     }
   };
 
@@ -664,7 +664,7 @@ export default function EventDetailsPage() {
       window.location.href = "/events";
     } catch (error) {
       console.error("Error archiving event:", error);
-      setError("Failed to archive the event. Please try again later.");
+      setError("Échec de l'archivage de l'événement. Veuillez réessayer plus tard.");
     }
   };
 
@@ -744,7 +744,7 @@ export default function EventDetailsPage() {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading event details...</p>
+            <p className="text-gray-600">Chargement des détails de l'événement...</p>
           </div>
         </div>
       </DefaultLayout>
@@ -780,10 +780,10 @@ export default function EventDetailsPage() {
           <div className="text-center">
             <div className="text-gray-400 text-6xl mb-4">📅</div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Event Not Found
+              Événement Non Trouvé
             </h2>
             <p className="text-gray-600">
-              The event you're looking for doesn't exist.
+              L'événement que vous recherchez n'existe pas.
             </p>
           </div>
         </div>
@@ -823,7 +823,7 @@ export default function EventDetailsPage() {
                     <Popover placement="left">
                       <PopoverTrigger className="bg-blue-600 p-2 rounded-r-lg text-white hover:bg-blue-700 transition-colors font-bold">
                         <div className="flex flex-col items-center">
-                          <span className="sr-only">QR Code</span>
+                          <span className="sr-only">Code QR</span>
                           <QrCode size={20} className="font-bold" />
                         </div>
                       </PopoverTrigger>
@@ -1539,7 +1539,7 @@ export default function EventDetailsPage() {
           </ModalContent>
         </Modal>
       </div>
-            <Toaster
+      <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,

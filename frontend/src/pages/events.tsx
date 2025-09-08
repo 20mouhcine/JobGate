@@ -32,8 +32,8 @@ export default function EventsPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
-  const steps = ["Basic info", "description", "Time slots"];
-  const  user  = useCurrentUser();
+  const steps = ["Informations de base", "Description", "Créneaux horaires"];
+  const user = useCurrentUser();
   const [selected, setSelected] = useState<React.Key>("events");
 
   const [formData, setFormData] = useState<EventFormData>({
@@ -67,7 +67,7 @@ export default function EventsPage() {
   const apiUrl =
     import.meta.env.VITE_API_URL || `http://localhost:8000/api/events/`;
 
-    const timeSlotApiUrl =
+  const timeSlotApiUrl =
     import.meta.env.VITE_TIMESLOT_API_URL ||
     "http://localhost:8000/api/time-slots/";
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -88,9 +88,9 @@ export default function EventsPage() {
       setError(null);
       try {
 
-        if(selected==="archivedEvents") setEvents([]);
-        const currentApiUrl = selected === "archivedEvents" ? 
-          `http://localhost:8000/api/events/?archived=true` : 
+        if (selected === "archivedEvents") setEvents([]);
+        const currentApiUrl = selected === "archivedEvents" ?
+          `http://localhost:8000/api/events/?archived=true` :
           apiUrl;
 
         const response = await fetch(currentApiUrl, {
@@ -107,14 +107,14 @@ export default function EventsPage() {
         setEvents(data);
       } catch (error) {
         console.error("Error fetching events:", error);
-        setError("Failed to fetch events. Please try again later.");
+        setError("Échec de la récupération des événements. Veuillez réessayer plus tard.");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchEvents();
-  }, [apiUrl,selected]);
+  }, [apiUrl, selected]);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -285,7 +285,7 @@ export default function EventsPage() {
     e.preventDefault();
 
     if (!isFormValid()) {
-      setError("Please fill in all required fields.");
+      setError("Veuillez remplir tous les champs obligatoires.");
       return;
     }
 
@@ -344,7 +344,7 @@ export default function EventsPage() {
         method: "POST",
         // Don't set Content-Type header - let browser set it with boundary
         body: formDataToSend,
-        headers:{
+        headers: {
           "Authorization": `Bearer ${localStorage.getItem('authToken')}`
         }
       });
@@ -377,9 +377,8 @@ export default function EventsPage() {
         });
 
         if (!timeSlotResponse.ok) {
-          console.error("Failed to create time slots, but event was created");
           setError(
-            "Event created successfully, but failed to create time slots. You can add them later."
+            "Événement créé avec succès, mais échec de la création des créneaux horaires. Vous pourrez les ajouter plus tard."
           );
         }
       }
@@ -416,18 +415,17 @@ export default function EventsPage() {
     } catch (error) {
       console.error("Error creating event:", error);
       setError(
-        `Failed to create event: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Échec de la création de l'événement: ${error instanceof Error ? error.message : "Erreur inconnue"}`
       );
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Reset error when modal closes
+
   const handleModalClose = () => {
     setError(null);
     setCurrentStep(0); // Reset step when modal closes
-    // Reset forms when modal closes
     setFormData({
       title: "",
       image: null,
@@ -455,1139 +453,1130 @@ export default function EventsPage() {
       <div className="flex w-full flex-col">
         <div className="flex w-full flex-col items-center">
           {user?.role === "recruiter" ? (
-          <Tabs aria-label="Options" className="mt-3 mr-18">
-            <Tab
-              key="events"
-            
-              onClick={() => setSelected("events")}
-              title={
-                <div className="flex items-center gap-2 justify-center">
-                  <CalendarDays className="w-5 h-5 text-primary" />
-                  <span className="text-sm font-medium">Événements</span>
-                </div>
-              }
-            >
+            <Tabs aria-label="Options" className="mt-3 mr-18">
+              <Tab
+                key="events"
 
-              <section className="py-8 md:py-10">
-                <div className="w-full max-w-7xl mx-auto px-4">
-                  <div className="flex justify-between items-center mb-6">
-                    <Input
-                      className="w-auto max-w-xs"
-                      placeholder="Search events..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    {
-                      user.role === "recruiter" && (<Button onPress={onOpen} color="primary">
-                        Creer un evenment
-                      </Button>)
-          }
-
+                onClick={() => setSelected("events")}
+                title={
+                  <div className="flex items-center gap-2 justify-center">
+                    <CalendarDays className="w-5 h-5 text-primary" />
+                    <span className="text-sm font-medium">Événements</span>
                   </div>
+                }
+              >
 
-              
+                <section className="py-8 md:py-10">
+                  <div className="w-full max-w-7xl mx-auto px-4">
+                    <div className="flex justify-between items-center mb-6">
+                      <Input
+                        className="w-auto max-w-xs"
+                        placeholder="Search events..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                      {
+                        user.role === "recruiter" && (<Button onPress={onOpen} color="primary">
+                          Creer un evenment
+                        </Button>)
+                      }
 
-                  {/* Error display */}
-                  {error && (
-                    <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-                      {error}
-                    </div>
-                  )}
-
-                  {/* Loading state */}
-                  {isLoading && !events.length ? (
-                    <div className="text-center py-8">
-                      <p>Loading events...</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
-                      {events
-                        .filter((event) =>
-                          event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          event.description.toLowerCase().includes(searchTerm.toLowerCase())
-                        )
-                        .map((event) => (
-                          <EventCard key={event.id} event={event} />
-                        ))}
-
-                    
                     </div>
 
-                  )}
 
-                  {/* Modal */}
-                  <Modal isOpen={isOpen} onOpenChange={handleModalClose} size="2xl">
-                    <ModalContent className="max-h-[90vh] overflow-hidden flex flex-col">
-                      {() => (
-                        <>
-                          <ModalHeader className="flex flex-col gap-4 pb-4">
-                            <div className="flex flex-col gap-1">
-                              <h2 className="text-lg font-semibold">Create Event</h2>
-                              <span className="text-default-500 text-sm">
-                                Step {currentStep + 1} of {steps.length}:{" "}
-                                {steps[currentStep]}
-                              </span>
-                            </div>
 
-                            {/* Step Progress Slider */}
-                            <div className="w-full">
-                              <div className="flex justify-between items-center mb-2">
-                                {steps.map((step, index) => (
-                                  <div
-                                    key={step}
-                                    className={`flex items-center ${index < steps.length - 1 ? "flex-1" : ""
-                                      }`}
-                                  >
-                                    <div className="flex flex-col items-center">
-                                      <div
-                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${index < currentStep
-                                          ? "bg-success text-white" // Completed steps
-                                          : index === currentStep
-                                            ? "bg-primary text-white" // Current step
-                                            : "bg-default-200 text-default-500" // Future steps
-                                          }`}
-                                      >
-                                        {index < currentStep ? (
-                                          <svg
-                                            className="w-4 h-4"
-                                            fill="currentColor"
-                                            viewBox="0 0 20 20"
-                                          >
-                                            <path
-                                              fillRule="evenodd"
-                                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                              clipRule="evenodd"
-                                            />
-                                          </svg>
-                                        ) : (
-                                          index + 1
-                                        )}
-                                      </div>
-                                      <span
-                                        className={`text-xs mt-1 text-center max-w-20 ${index === currentStep
-                                          ? "text-primary font-medium"
-                                          : "text-default-500"
-                                          }`}
-                                      >
-                                        {step}
-                                      </span>
-                                    </div>
-                                    {index < steps.length - 1 && (
-                                      <div className="flex-1 mx-2">
-                                        <div
-                                          className={`h-0.5 transition-all duration-200 ${index < currentStep
-                                            ? "bg-success"
-                                            : "bg-default-200"
-                                            }`}
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
+                    {/* Error display */}
+                    {error && (
+                      <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                        {error}
+                      </div>
+                    )}
+
+                    {/* Loading state */}
+                    {isLoading && !events.length ? (
+                      <div className="text-center py-8">
+                        <p>Chargement des événements...</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
+                        {events
+                          .filter((event) =>
+                            event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            event.description.toLowerCase().includes(searchTerm.toLowerCase())
+                          )
+                          .map((event) => (
+                            <EventCard key={event.id} event={event} />
+                          ))}
+
+
+                      </div>
+
+                    )}
+
+                    {/* Modal */}
+                    <Modal isOpen={isOpen} onOpenChange={handleModalClose} size="2xl">
+                      <ModalContent className="max-h-[90vh] overflow-hidden flex flex-col">
+                        {() => (
+                          <>
+                            <ModalHeader className="flex flex-col gap-4 pb-4">
+                              <div className="flex flex-col gap-1">
+                                <h2 className="text-lg font-semibold">Créer un Événement</h2>
+                                <span className="text-default-500 text-sm">
+                                  Step {currentStep + 1} of {steps.length}:{" "}
+                                  {steps[currentStep]}
+                                </span>
                               </div>
 
-                              {/* Progress Bar */}
-                              <div className="w-full bg-default-200 rounded-full h-1">
-                                <div
-                                  className="bg-primary h-1 rounded-full transition-all duration-300 ease-out"
-                                  style={{
-                                    width: `${(currentStep / (steps.length - 1)) * 100}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </ModalHeader>
-                          <ModalBody className="overflow-y-auto px-4 flex-1">
-                            <div className="flex flex-col gap-4">
-                              {currentStep === 0 && (
-                                <>
-                                  <Input
-                                    label="Event Name"
-                                    name="title"
-                                    placeholder="Enter event name"
-                                    required
-                                    value={formData.title}
-                                    onChange={handleChange}
-                                    isDisabled={isLoading}
-                                  />
-
-                                  <div className="flex flex-col gap-2">
-                                    <Input
-                                      label="Event Image"
-                                      type="file"
-                                      name="image"
-                                      accept="image/*"
-                                      onChange={handleFileChange}
-                                      isDisabled={isLoading}
-                                      description="Select an image file for the event banner"
-                                      isRequired
-                                    />
-                                    {formData.image && (
-                                      <div className="text-sm text-gray-600">
-                                        Selected: {formData.image.name}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <Input
-                                    label="Event Caption"
-                                    name="caption"
-                                    placeholder="Enter Event caption"
-                                    required
-                                    value={formData.caption || ""}
-                                    onChange={handleChange}
-                                    isDisabled={isLoading}
-                                    description="Brief description of the event"
-                                  />
-
-                                  <div className="flex gap-4">
-                                    <DatePicker
-                                      label="Start Date"
-                                      value={formData.start_date}
-                                      onChange={handleStartDateChange}
-                                      isDisabled={isLoading}
-                                      isRequired
-                                    />
-                                    <DatePicker
-                                      label="End Date"
-                                      value={formData.end_date}
-                                      onChange={handleEndDateChange}
-                                      isDisabled={isLoading}
-                                      isRequired
-                                    />
-                                  </div>
-
-                                  <div className="flex flex-row gap-4">
-                                    <NumberInput
-                                      label="Number of Recruiters"
-                                      className="flex-1"
-                                      placeholder="1"
-                                      value={formData.recruiters_number || 1}
-                                      onValueChange={handleRecruitersNumberChange}
-                                      isDisabled={isLoading}
-                                      min={1}
-                                      max={20}
-                                      step={1}
-                                      description="Number of recruiters for this event"
-                                      isRequired
-                                    />
-                                    <div className="flex items-center -mt-6">
-                                      <Switch
-                                        isSelected={formData.is_online || false}
-                                        onValueChange={handleOnlineEventChange}
-                                        isDisabled={isLoading}
-                                      >
-                                        Online Event
-                                      </Switch>
-                                    </div>
-                                  </div>
-
-                                  {formData.is_online ? (
-                                    <Input
-                                      label="Meeting Link"
-                                      name="meeting_link"
-                                      placeholder="Enter meeting link (Zoom, Teams, etc.)"
-                                      required
-                                      value={formData.meeting_link || ""}
-                                      onChange={handleChange}
-                                      isDisabled={isLoading}
-                                    />
-                                  ) : (
-                                    <Input
-                                      label="Location"
-                                      name="location"
-                                      placeholder="Enter event location"
-                                      required
-                                      value={formData.location || ""}
-                                      onChange={handleChange}
-                                      isDisabled={isLoading}
-                                    />
-                                  )}
-                                </>
-                              )}
-
-                              {currentStep === 1 && (
-                                <div>
-                                  <label className="block text-sm font-medium mb-1">
-                                    Description *
-                                  </label>
-                                  <ReactQuill
-                                    value={formData.description}
-                                    onChange={(value) =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        description: value,
-                                      }))
-                                    }
-                                    className="h-screen"
-                                    modules={{
-                                      toolbar: {
-                                        container: [
-                                          [{ header: [1, 2, false] }],
-                                          ["bold", "italic", "underline", "strike"],
-                                          ["blockquote", "code-block"],
-                                          [{ list: "ordered" }, { list: "bullet" }],
-                                          ["link", "image", "video"],
-                                          ["clean"],
-                                        ],
-                                      },
-                                    }}
-                                    formats={[
-                                      "header",
-                                      "bold",
-                                      "italic",
-                                      "underline",
-                                      "strike",
-                                      "blockquote",
-                                      "code-block",
-                                      "list",
-                                      "bullet",
-                                      "link",
-                                      "image",
-                                      "video",
-                                    ]}
-                                    readOnly={isLoading}
-                                  />
-                                </div>
-                              )}
-
-                              {currentStep === 2 && (
-                                <>
-                                  <div className="flex items-center gap-2">
-                                    <Switch
-                                      isSelected={formData.is_timeSlot_enabled}
-                                      onValueChange={handleSwitchChange}
-                                      isDisabled={isLoading}
+                              {/* Step Progress Slider */}
+                              <div className="w-full">
+                                <div className="flex justify-between items-center mb-2">
+                                  {steps.map((step, index) => (
+                                    <div
+                                      key={step}
+                                      className={`flex items-center ${index < steps.length - 1 ? "flex-1" : ""
+                                        }`}
                                     >
-                                      Enable Appointments
-                                    </Switch>
-                                  </div>
-
-                                  {formData.is_timeSlot_enabled && (
-                                    <div className="border-t pt-4 mt-2">
-                                      <h4 className="text-sm font-medium text-gray-700 mb-3">
-                                        Time Slot Configuration
-                                      </h4>
-                                      <div className="space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                          <TimeInput
-                                            label="Start Time"
-                                            onChange={handleStartTimeChange}
-                                            isDisabled={isLoading}
-                                            isRequired
-                                            hourCycle={24}
-                                            description="Appointment start time"
-                                          />
-                                          <TimeInput
-                                            label="End Time"
-                                            onChange={handleEndTimeChange}
-                                            isDisabled={isLoading}
-                                            isRequired
-                                            hourCycle={24}
-                                            description="Appointment end time"
+                                      <div className="flex flex-col items-center">
+                                        <div
+                                          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${index < currentStep
+                                            ? "bg-success text-white" // Completed steps
+                                            : index === currentStep
+                                              ? "bg-primary text-white" // Current step
+                                              : "bg-default-200 text-default-500" // Future steps
+                                            }`}
+                                        >
+                                          {index < currentStep ? (
+                                            <svg
+                                              className="w-4 h-4"
+                                              fill="currentColor"
+                                              viewBox="0 0 20 20"
+                                            >
+                                              <path
+                                                fillRule="evenodd"
+                                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                clipRule="evenodd"
+                                              />
+                                            </svg>
+                                          ) : (
+                                            index + 1
+                                          )}
+                                        </div>
+                                        <span
+                                          className={`text-xs mt-1 text-center max-w-20 ${index === currentStep
+                                            ? "text-primary font-medium"
+                                            : "text-default-500"
+                                            }`}
+                                        >
+                                          {step}
+                                        </span>
+                                      </div>
+                                      {index < steps.length - 1 && (
+                                        <div className="flex-1 mx-2">
+                                          <div
+                                            className={`h-0.5 transition-all duration-200 ${index < currentStep
+                                              ? "bg-success"
+                                              : "bg-default-200"
+                                              }`}
                                           />
                                         </div>
-                                        <NumberInput
-                                          label="Slot Duration (minutes)"
-                                          placeholder="10"
-                                          value={timeSlotData.slot}
-                                          onValueChange={handleSlotChange}
-                                          isDisabled={isLoading}
-                                          min={5}
-                                          max={120}
-                                          step={5}
-                                          description="Duration of each time slot in minutes"
-                                        />
-                                      </div>
+                                      )}
                                     </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </ModalBody>
-                          <ModalFooter className="sticky bottom-0 bg-white z-10">
-                            {currentStep > 0 && (
-                              <Button onClick={handlePreviousStep} type="button">
-                                Previous
-                              </Button>
-                            )}
-                            {currentStep < steps.length - 1 ? (
-                              <Button
-                                onClick={handleNextStep}
-                                isDisabled={!isStepValid(currentStep)}
-                                color="primary"
-                                variant="flat"
-                                type="button"
-                              >
-                                Next
-                              </Button>
-                            ) : (
-                              <Button
-                                onClick={handleSubmit}
-                                isDisabled={!isFormValid()}
-                                isLoading={isLoading}
-                                color="primary"
-                                type="button"
-                              >
-                                {isLoading ? "Creating..." : "Create Event"}
-                              </Button>
-                            )}
-                          </ModalFooter>
-                        </>
-                      )}
-                    </ModalContent>
-                  </Modal>
-                </div>
-              </section>
+                                  ))}
+                                </div>
 
-            </Tab>
-            <Tab
-              key="archivedEvents"
-              onClick={() => setSelected("archivedEvents")}
-
-              title={
-                <div className="flex items-center gap-2 justify-center">
-                  <Archive className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm font-medium">Archivés</span>
-                </div>
-              }
-            >
-
-              <section className="py-8 md:py-10">
-                <div className="w-full max-w-7xl mx-auto px-4">
-                  <div className="flex justify-between items-center mb-6">
-                    <Input
-                      className="w-auto max-w-xs"
-                      placeholder="Search events..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-
-                  </div>
-
-                  {/* Error display */}
-                  {error && (
-                    <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-                      {error}
-                    </div>
-                  )}
-
-                  {/* Loading state */}
-                  {isLoading && !events.length ? (
-                    <div className="text-center py-8">
-                      <p>Loading events...</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
-                      {events
-                        .filter((event) =>
-                          event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          event.description.toLowerCase().includes(searchTerm.toLowerCase())
-                        )
-                        .map((event) => (
-                          <EventCard key={event.id} event={event} />
-                        ))}
-
-                    </div>
-
-                  )}
-
-                  {/* Modal */}
-                  <Modal isOpen={isOpen} onOpenChange={handleModalClose} size="2xl">
-                    <ModalContent className="max-h-[90vh] overflow-hidden flex flex-col">
-                      {() => (
-                        <>
-                          <ModalHeader className="flex flex-col gap-4 pb-4">
-                            <div className="flex flex-col gap-1">
-                              <h2 className="text-lg font-semibold">Create Event</h2>
-                              <span className="text-default-500 text-sm">
-                                Step {currentStep + 1} of {steps.length}:{" "}
-                                {steps[currentStep]}
-                              </span>
-                            </div>
-
-                            {/* Step Progress Slider */}
-                            <div className="w-full">
-                              <div className="flex justify-between items-center mb-2">
-                                {steps.map((step, index) => (
+                                {/* Progress Bar */}
+                                <div className="w-full bg-default-200 rounded-full h-1">
                                   <div
-                                    key={step}
-                                    className={`flex items-center ${index < steps.length - 1 ? "flex-1" : ""
-                                      }`}
-                                  >
-                                    <div className="flex flex-col items-center">
-                                      <div
-                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${index < currentStep
-                                          ? "bg-success text-white" // Completed steps
-                                          : index === currentStep
-                                            ? "bg-primary text-white" // Current step
-                                            : "bg-default-200 text-default-500" // Future steps
-                                          }`}
-                                      >
-                                        {index < currentStep ? (
-                                          <svg
-                                            className="w-4 h-4"
-                                            fill="currentColor"
-                                            viewBox="0 0 20 20"
-                                          >
-                                            <path
-                                              fillRule="evenodd"
-                                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                              clipRule="evenodd"
-                                            />
-                                          </svg>
-                                        ) : (
-                                          index + 1
-                                        )}
-                                      </div>
-                                      <span
-                                        className={`text-xs mt-1 text-center max-w-20 ${index === currentStep
-                                          ? "text-primary font-medium"
-                                          : "text-default-500"
-                                          }`}
-                                      >
-                                        {step}
-                                      </span>
-                                    </div>
-                                    {index < steps.length - 1 && (
-                                      <div className="flex-1 mx-2">
-                                        <div
-                                          className={`h-0.5 transition-all duration-200 ${index < currentStep
-                                            ? "bg-success"
-                                            : "bg-default-200"
-                                            }`}
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-
-                              {/* Progress Bar */}
-                              <div className="w-full bg-default-200 rounded-full h-1">
-                                <div
-                                  className="bg-primary h-1 rounded-full transition-all duration-300 ease-out"
-                                  style={{
-                                    width: `${(currentStep / (steps.length - 1)) * 100}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </ModalHeader>
-                          <ModalBody className="overflow-y-auto px-4 flex-1">
-                            <div className="flex flex-col gap-4">
-                              {currentStep === 0 && (
-                                <>
-                                  <Input
-                                    label="Event Name"
-                                    name="title"
-                                    placeholder="Enter event name"
-                                    required
-                                    value={formData.title}
-                                    onChange={handleChange}
-                                    isDisabled={isLoading}
-                                  />
-
-                                  <div className="flex flex-col gap-2">
-                                    <Input
-                                      label="Event Image"
-                                      type="file"
-                                      name="image"
-                                      accept="image/*"
-                                      onChange={handleFileChange}
-                                      isDisabled={isLoading}
-                                      description="Select an image file for the event banner"
-                                      isRequired
-                                    />
-                                    {formData.image && (
-                                      <div className="text-sm text-gray-600">
-                                        Selected: {formData.image.name}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <Input
-                                    label="Event Caption"
-                                    name="caption"
-                                    placeholder="Enter Event caption"
-                                    required
-                                    value={formData.caption || ""}
-                                    onChange={handleChange}
-                                    isDisabled={isLoading}
-                                    description="Brief description of the event"
-                                  />
-
-                                  <div className="flex gap-4">
-                                    <DatePicker
-                                      label="Start Date"
-                                      value={formData.start_date}
-                                      onChange={handleStartDateChange}
-                                      isDisabled={isLoading}
-                                      isRequired
-                                    />
-                                    <DatePicker
-                                      label="End Date"
-                                      value={formData.end_date}
-                                      onChange={handleEndDateChange}
-                                      isDisabled={isLoading}
-                                      isRequired
-                                    />
-                                  </div>
-
-                                  <div className="flex flex-row gap-4">
-                                    <NumberInput
-                                      label="Number of Recruiters"
-                                      className="flex-1"
-                                      placeholder="1"
-                                      value={formData.recruiters_number || 1}
-                                      onValueChange={handleRecruitersNumberChange}
-                                      isDisabled={isLoading}
-                                      min={1}
-                                      max={20}
-                                      step={1}
-                                      description="Number of recruiters for this event"
-                                      isRequired
-                                    />
-                                    <div className="flex items-center -mt-6">
-                                      <Switch
-                                        isSelected={formData.is_online || false}
-                                        onValueChange={handleOnlineEventChange}
-                                        isDisabled={isLoading}
-                                      >
-                                        Online Event
-                                      </Switch>
-                                    </div>
-                                  </div>
-
-                                  {formData.is_online ? (
-                                    <Input
-                                      label="Meeting Link"
-                                      name="meeting_link"
-                                      placeholder="Enter meeting link (Zoom, Teams, etc.)"
-                                      required
-                                      value={formData.meeting_link || ""}
-                                      onChange={handleChange}
-                                      isDisabled={isLoading}
-                                    />
-                                  ) : (
-                                    <Input
-                                      label="Location"
-                                      name="location"
-                                      placeholder="Enter event location"
-                                      required
-                                      value={formData.location || ""}
-                                      onChange={handleChange}
-                                      isDisabled={isLoading}
-                                    />
-                                  )}
-                                </>
-                              )}
-
-                              {currentStep === 1 && (
-                                <div>
-                                  <label className="block text-sm font-medium mb-1">
-                                    Description *
-                                  </label>
-                                  <ReactQuill
-                                    value={formData.description}
-                                    onChange={(value) =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        description: value,
-                                      }))
-                                    }
-                                    className="h-screen"
-                                    modules={{
-                                      toolbar: {
-                                        container: [
-                                          [{ header: [1, 2, false] }],
-                                          ["bold", "italic", "underline", "strike"],
-                                          ["blockquote", "code-block"],
-                                          [{ list: "ordered" }, { list: "bullet" }],
-                                          ["link", "image", "video"],
-                                          ["clean"],
-                                        ],
-                                      },
+                                    className="bg-primary h-1 rounded-full transition-all duration-300 ease-out"
+                                    style={{
+                                      width: `${(currentStep / (steps.length - 1)) * 100}%`,
                                     }}
-                                    formats={[
-                                      "header",
-                                      "bold",
-                                      "italic",
-                                      "underline",
-                                      "strike",
-                                      "blockquote",
-                                      "code-block",
-                                      "list",
-                                      "bullet",
-                                      "link",
-                                      "image",
-                                      "video",
-                                    ]}
-                                    readOnly={isLoading}
                                   />
                                 </div>
-                              )}
-
-                              {currentStep === 2 && (
-                                <>
-                                  <div className="flex items-center gap-2">
-                                    <Switch
-                                      isSelected={formData.is_timeSlot_enabled}
-                                      onValueChange={handleSwitchChange}
+                              </div>
+                            </ModalHeader>
+                            <ModalBody className="overflow-y-auto px-4 flex-1">
+                              <div className="flex flex-col gap-4">
+                                {currentStep === 0 && (
+                                  <>
+                                    <Input
+                                      label="Nom de l'Événement"
+                                      name="title"
+                                      placeholder="Entrez le nom de l'événement"
+                                      required
+                                      value={formData.title}
+                                      onChange={handleChange}
                                       isDisabled={isLoading}
-                                    >
-                                      Enable Appointments
-                                    </Switch>
-                                  </div>
+                                    />
 
-                                  {formData.is_timeSlot_enabled && (
-                                    <div className="border-t pt-4 mt-2">
-                                      <h4 className="text-sm font-medium text-gray-700 mb-3">
-                                        Time Slot Configuration
-                                      </h4>
-                                      <div className="space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                          <TimeInput
-                                            label="Start Time"
-                                            onChange={handleStartTimeChange}
-                                            isDisabled={isLoading}
-                                            isRequired
-                                            hourCycle={24}
-                                            description="Appointment start time"
-                                          />
-                                          <TimeInput
-                                            label="End Time"
-                                            onChange={handleEndTimeChange}
-                                            isDisabled={isLoading}
-                                            isRequired
-                                            hourCycle={24}
-                                            description="Appointment end time"
-                                          />
+                                    <div className="flex flex-col gap-2">
+                                      <Input
+                                        label="Image de l'Événement"
+                                        type="file"
+                                        name="image"
+                                        accept="image/*"
+                                        onChange={handleFileChange}
+                                        isDisabled={isLoading}
+                                        description="Sélectionnez un fichier image pour la bannière de l'événement"
+                                        isRequired
+                                      />
+                                      {formData.image && (
+                                        <div className="text-sm text-gray-600">
+                                          Sélectionné : {formData.image.name}
                                         </div>
-                                        <NumberInput
-                                          label="Slot Duration (minutes)"
-                                          placeholder="10"
-                                          value={timeSlotData.slot}
-                                          onValueChange={handleSlotChange}
+                                      )}
+                                    </div>
+
+                                    <Input
+                                      label="Légende de l'Événement"
+                                      name="caption"
+                                      placeholder="Entrez la légende de l'événement"
+                                      required
+                                      value={formData.caption || ""}
+                                      onChange={handleChange}
+                                      isDisabled={isLoading}
+                                      description="Brève description de l'événement"
+                                    />
+
+                                    <div className="flex gap-4">
+                                      <DatePicker
+                                        label="Date de début"
+                                        value={formData.start_date}
+                                        onChange={handleStartDateChange}
+                                        isDisabled={isLoading}
+                                        isRequired
+                                      />
+                                      <DatePicker
+                                        label="Date de fin"
+                                        value={formData.end_date}
+                                        onChange={handleEndDateChange}
+                                        isDisabled={isLoading}
+                                        isRequired
+                                      />
+                                    </div>
+
+                                    <div className="flex flex-row gap-4">
+                                      <NumberInput
+                                        label="Nombre de Recruteurs"
+                                        className="flex-1"
+                                        placeholder="1"
+                                        value={formData.recruiters_number || 1}
+                                        onValueChange={handleRecruitersNumberChange}
+                                        isDisabled={isLoading}
+                                        min={1}
+                                        max={20}
+                                        step={1}
+                                        description="Nombre de recruteurs pour cet événement"
+                                        isRequired
+                                      />
+                                      <div className="flex items-center -mt-6">
+                                        <Switch
+                                          isSelected={formData.is_online || false}
+                                          onValueChange={handleOnlineEventChange}
                                           isDisabled={isLoading}
-                                          min={5}
-                                          max={120}
-                                          step={5}
-                                          description="Duration of each time slot in minutes"
-                                        />
+                                        >
+                                          Événement en Ligne
+                                        </Switch>
                                       </div>
                                     </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </ModalBody>
-                          <ModalFooter className="sticky bottom-0 bg-white z-10">
-                            {currentStep > 0 && (
-                              <Button onClick={handlePreviousStep} type="button">
-                                Previous
-                              </Button>
-                            )}
-                            {currentStep < steps.length - 1 ? (
-                              <Button
-                                onClick={handleNextStep}
-                                isDisabled={!isStepValid(currentStep)}
-                                color="primary"
-                                variant="flat"
-                                type="button"
-                              >
-                                Next
-                              </Button>
-                            ) : (
-                              <Button
-                                onClick={handleSubmit}
-                                isDisabled={!isFormValid()}
-                                isLoading={isLoading}
-                                color="primary"
-                                type="button"
-                              >
-                                {isLoading ? "Creating..." : "Create Event"}
-                              </Button>
-                            )}
-                          </ModalFooter>
-                        </>
-                      )}
-                    </ModalContent>
-                  </Modal>
-                </div>
-              </section>
 
-            </Tab>
-          </Tabs>
+                                    {formData.is_online ? (
+                                      <Input
+                                        label="Lien de Réunion"
+                                        name="meeting_link"
+                                        placeholder="Entrez le lien de réunion (Zoom, Teams, etc.)"
+                                        required
+                                        value={formData.meeting_link || ""}
+                                        onChange={handleChange}
+                                        isDisabled={isLoading}
+                                      />
+                                    ) : (
+                                      <Input
+                                        label="lieu"
+                                        name="location"
+                                        placeholder="Entrez le lieu de l'événement"
+                                        required
+                                        value={formData.location || ""}
+                                        onChange={handleChange}
+                                        isDisabled={isLoading}
+                                      />
+                                    )}
+                                  </>
+                                )}
+
+                                {currentStep === 1 && (
+                                  <div>
+                                    <label className="block text-sm font-medium mb-1">
+                                      Description *
+                                    </label>
+                                    <ReactQuill
+                                      value={formData.description}
+                                      onChange={(value) =>
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          description: value,
+                                        }))
+                                      }
+                                      className="h-screen"
+                                      modules={{
+                                        toolbar: {
+                                          container: [
+                                            [{ header: [1, 2, false] }],
+                                            ["bold", "italic", "underline", "strike"],
+                                            ["blockquote", "code-block"],
+                                            [{ list: "ordered" }, { list: "bullet" }],
+                                            ["link", "image", "video"],
+                                            ["clean"],
+                                          ],
+                                        },
+                                      }}
+                                      formats={[
+                                        "header",
+                                        "bold",
+                                        "italic",
+                                        "underline",
+                                        "strike",
+                                        "blockquote",
+                                        "code-block",
+                                        "list",
+                                        "bullet",
+                                        "link",
+                                        "image",
+                                        "video",
+                                      ]}
+                                      readOnly={isLoading}
+                                    />
+                                  </div>
+                                )}
+
+                                {currentStep === 2 && (
+                                  <>
+                                    <div className="flex items-center gap-2">
+                                      <Switch
+                                        isSelected={formData.is_timeSlot_enabled}
+                                        onValueChange={handleSwitchChange}
+                                        isDisabled={isLoading}
+                                      >
+                                        Activer les Rendez-vous
+                                      </Switch>
+                                    </div>
+
+                                    {formData.is_timeSlot_enabled && (
+                                      <div className="border-t pt-4 mt-2">
+                                        <h4 className="text-sm font-medium text-gray-700 mb-3">
+                                          Configuration des Créneaux Horaires
+                                        </h4>
+                                        <div className="space-y-4">
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <TimeInput
+                                              label="Date de début"
+                                              onChange={handleStartTimeChange}
+                                              isDisabled={isLoading}
+                                              isRequired
+                                              hourCycle={24}
+                                              description="Heure de début du rendez-vous"
+                                            />
+                                            <TimeInput
+                                              label="Date de fin"
+                                              onChange={handleEndTimeChange}
+                                              isDisabled={isLoading}
+                                              isRequired
+                                              hourCycle={24}
+                                              description="Heure de fin du rendez-vous"
+                                            />
+                                          </div>
+                                          <NumberInput
+                                            label="Slot Duration (minutes)"
+                                            placeholder="10"
+                                            value={timeSlotData.slot}
+                                            onValueChange={handleSlotChange}
+                                            isDisabled={isLoading}
+                                            min={5}
+                                            max={120}
+                                            step={5}
+                                            description="Duration of each time slot in minutes"
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </ModalBody>
+                            <ModalFooter className="sticky bottom-0 bg-white z-10">
+                              {currentStep > 0 && (
+                                <Button onClick={handlePreviousStep} type="button">
+                                  Précédent
+                                </Button>
+                              )}
+                              {currentStep < steps.length - 1 ? (
+                                <Button
+                                  onClick={handleNextStep}
+                                  isDisabled={!isStepValid(currentStep)}
+                                  color="primary"
+                                  variant="flat"
+                                  type="button"
+                                >
+                                  Suivant
+                                </Button>
+                              ) : (
+                                <Button
+                                  onClick={handleSubmit}
+                                  isDisabled={!isFormValid()}
+                                  isLoading={isLoading}
+                                  color="primary"
+                                  type="button"
+                                >
+                                  {isLoading ? "Création en cours..." : "Créer l'Événement"}
+                                </Button>
+                              )}
+                            </ModalFooter>
+                          </>
+                        )}
+                      </ModalContent>
+                    </Modal>
+                  </div>
+                </section>
+
+              </Tab>
+              <Tab
+                key="archivedEvents"
+                onClick={() => setSelected("archivedEvents")}
+
+                title={
+                  <div className="flex items-center gap-2 justify-center">
+                    <Archive className="w-5 h-5 text-gray-600" />
+                    <span className="text-sm font-medium">Archivés</span>
+                  </div>
+                }
+              >
+
+                <section className="py-8 md:py-10">
+                  <div className="w-full max-w-7xl mx-auto px-4">
+                    <div className="flex justify-between items-center mb-6">
+                      <Input
+                        className="w-auto max-w-xs"
+                        placeholder="Rechercher..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+
+                    </div>
+
+                    {/* Error display */}
+                    {error && (
+                      <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                        {error}
+                      </div>
+                    )}
+
+                    {/* Loading state */}
+                    {isLoading && !events.length ? (
+                      <div className="text-center py-8">
+                        <p>Chargement des événements...</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
+                        {events
+                          .filter((event) =>
+                            event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            event.description.toLowerCase().includes(searchTerm.toLowerCase())
+                          )
+                          .map((event) => (
+                            <EventCard key={event.id} event={event} />
+                          ))}
+
+                      </div>
+
+                    )}
+
+                    {/* Modal */}
+                    <Modal isOpen={isOpen} onOpenChange={handleModalClose} size="2xl">
+                      <ModalContent className="max-h-[90vh] overflow-hidden flex flex-col">
+                        {() => (
+                          <>
+                            <ModalHeader className="flex flex-col gap-4 pb-4">
+                              <div className="flex flex-col gap-1">
+                                <h2 className="text-lg font-semibold">Créer l'Événement</h2>
+                                <span className="text-default-500 text-sm">
+                                  Step {currentStep + 1} of {steps.length}:{" "}
+                                  {steps[currentStep]}
+                                </span>
+                              </div>
+
+                              {/* Step Progress Slider */}
+                              <div className="w-full">
+                                <div className="flex justify-between items-center mb-2">
+                                  {steps.map((step, index) => (
+                                    <div
+                                      key={step}
+                                      className={`flex items-center ${index < steps.length - 1 ? "flex-1" : ""
+                                        }`}
+                                    >
+                                      <div className="flex flex-col items-center">
+                                        <div
+                                          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${index < currentStep
+                                            ? "bg-success text-white" // Completed steps
+                                            : index === currentStep
+                                              ? "bg-primary text-white" // Current step
+                                              : "bg-default-200 text-default-500" // Future steps
+                                            }`}
+                                        >
+                                          {index < currentStep ? (
+                                            <svg
+                                              className="w-4 h-4"
+                                              fill="currentColor"
+                                              viewBox="0 0 20 20"
+                                            >
+                                              <path
+                                                fillRule="evenodd"
+                                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                clipRule="evenodd"
+                                              />
+                                            </svg>
+                                          ) : (
+                                            index + 1
+                                          )}
+                                        </div>
+                                        <span
+                                          className={`text-xs mt-1 text-center max-w-20 ${index === currentStep
+                                            ? "text-primary font-medium"
+                                            : "text-default-500"
+                                            }`}
+                                        >
+                                          {step}
+                                        </span>
+                                      </div>
+                                      {index < steps.length - 1 && (
+                                        <div className="flex-1 mx-2">
+                                          <div
+                                            className={`h-0.5 transition-all duration-200 ${index < currentStep
+                                              ? "bg-success"
+                                              : "bg-default-200"
+                                              }`}
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Progress Bar */}
+                                <div className="w-full bg-default-200 rounded-full h-1">
+                                  <div
+                                    className="bg-primary h-1 rounded-full transition-all duration-300 ease-out"
+                                    style={{
+                                      width: `${(currentStep / (steps.length - 1)) * 100}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </ModalHeader>
+                            <ModalBody className="overflow-y-auto px-4 flex-1">
+                              <div className="flex flex-col gap-4">
+                                {currentStep === 0 && (
+                                  <>
+                                    <Input
+                                      label="Nom de l'Événement"
+                                      name="title"
+                                      placeholder="Entrez le nom de l'événement"
+                                      required
+                                      value={formData.title}
+                                      onChange={handleChange}
+                                      isDisabled={isLoading}
+                                    />
+
+                                    <div className="flex flex-col gap-2">
+                                      <Input
+                                        label="Image de l'Événement"
+                                        type="file"
+                                        name="image"
+                                        accept="image/*"
+                                        onChange={handleFileChange}
+                                        isDisabled={isLoading}
+                                        description="Sélectionnez un fichier image pour la bannière de l'événement"
+                                        isRequired
+                                      />
+                                      {formData.image && (
+                                        <div className="text-sm text-gray-600">
+                                          Selected: {formData.image.name}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <Input
+                                      label="Légende de l'Événement"
+                                      name="caption"
+                                      placeholder="Entrez la légende de l'événement"
+                                      required
+                                      value={formData.caption || ""}
+                                      onChange={handleChange}
+                                      isDisabled={isLoading}
+                                      description="Brève description de l'événement"
+                                    />
+
+                                    <div className="flex gap-4">
+                                      <DatePicker
+                                        label="Date de début"
+                                        value={formData.start_date}
+                                        onChange={handleStartDateChange}
+                                        isDisabled={isLoading}
+                                        isRequired
+                                      />
+                                      <DatePicker
+                                        label="Date de fin"
+                                        value={formData.end_date}
+                                        onChange={handleEndDateChange}
+                                        isDisabled={isLoading}
+                                        isRequired
+                                      />
+                                    </div>
+
+                                    <div className="flex flex-row gap-4">
+                                      <NumberInput
+                                        label="Nombre de Recruteurs"
+                                        className="flex-1"
+                                        placeholder="1"
+                                        value={formData.recruiters_number || 1}
+                                        onValueChange={handleRecruitersNumberChange}
+                                        isDisabled={isLoading}
+                                        min={1}
+                                        max={20}
+                                        step={1}
+                                        description="Nombre de recruteurs pour cet événement"
+                                        isRequired
+                                      />
+                                      <div className="flex items-center -mt-6">
+                                        <Switch
+                                          isSelected={formData.is_online || false}
+                                          onValueChange={handleOnlineEventChange}
+                                          isDisabled={isLoading}
+                                        >
+                                          Événement en Ligne
+                                        </Switch>
+                                      </div>
+                                    </div>
+
+                                    {formData.is_online ? (
+                                      <Input
+                                        label="Lien de Réunion"
+                                        name="meeting_link"
+                                        placeholder="Entrez le lien de réunion (Zoom, Teams, etc.)"
+                                        required
+                                        value={formData.meeting_link || ""}
+                                        onChange={handleChange}
+                                        isDisabled={isLoading}
+                                      />
+                                    ) : (
+                                      <Input
+                                        label="Lieu"
+                                        name="location"
+                                        placeholder="Entrez le lieu de l'événement"
+                                        required
+                                        value={formData.location || ""}
+                                        onChange={handleChange}
+                                        isDisabled={isLoading}
+                                      />
+                                    )}
+                                  </>
+                                )}
+
+                                {currentStep === 1 && (
+                                  <div>
+                                    <label className="block text-sm font-medium mb-1">
+                                      Description *
+                                    </label>
+                                    <ReactQuill
+                                      value={formData.description}
+                                      onChange={(value) =>
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          description: value,
+                                        }))
+                                      }
+                                      className="h-screen"
+                                      modules={{
+                                        toolbar: {
+                                          container: [
+                                            [{ header: [1, 2, false] }],
+                                            ["bold", "italic", "underline", "strike"],
+                                            ["blockquote", "code-block"],
+                                            [{ list: "ordered" }, { list: "bullet" }],
+                                            ["link", "image", "video"],
+                                            ["clean"],
+                                          ],
+                                        },
+                                      }}
+                                      formats={[
+                                        "header",
+                                        "bold",
+                                        "italic",
+                                        "underline",
+                                        "strike",
+                                        "blockquote",
+                                        "code-block",
+                                        "list",
+                                        "bullet",
+                                        "link",
+                                        "image",
+                                        "video",
+                                      ]}
+                                      readOnly={isLoading}
+                                    />
+                                  </div>
+                                )}
+
+                                {currentStep === 2 && (
+                                  <>
+                                    <div className="flex items-center gap-2">
+                                      <Switch
+                                        isSelected={formData.is_timeSlot_enabled}
+                                        onValueChange={handleSwitchChange}
+                                        isDisabled={isLoading}
+                                      >
+                                        Activer les Rendez-vous
+                                      </Switch>
+                                    </div>
+
+                                    {formData.is_timeSlot_enabled && (
+                                      <div className="border-t pt-4 mt-2">
+                                        <h4 className="text-sm font-medium text-gray-700 mb-3">
+                                          Configuration des Créneaux Horaires
+                                        </h4>
+                                        <div className="space-y-4">
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <TimeInput
+                                              label="Date de début"
+                                              onChange={handleStartTimeChange}
+                                              isDisabled={isLoading}
+                                              isRequired
+                                              hourCycle={24}
+                                              description="Heure de début du rendez-vous"
+                                            />
+                                            <TimeInput
+                                              label="Date de fin"
+                                              onChange={handleEndTimeChange}
+                                              isDisabled={isLoading}
+                                              isRequired
+                                              hourCycle={24}
+                                              description="Heure de fin du rendez-vous"
+                                            />
+                                          </div>
+                                          <NumberInput
+                                            label="Durée du Créneau (minutes)"
+                                            placeholder="10"
+                                            value={timeSlotData.slot}
+                                            onValueChange={handleSlotChange}
+                                            isDisabled={isLoading}
+                                            min={5}
+                                            max={120}
+                                            step={5}
+                                            description="Durée de chaque créneau horaire en minutes"
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </ModalBody>
+                            <ModalFooter className="sticky bottom-0 bg-white z-10">
+                              {currentStep > 0 && (
+                                <Button onClick={handlePreviousStep} type="button">
+                                  Previous
+                                </Button>
+                              )}
+                              {currentStep < steps.length - 1 ? (
+                                <Button
+                                  onClick={handleNextStep}
+                                  isDisabled={!isStepValid(currentStep)}
+                                  color="primary"
+                                  variant="flat"
+                                  type="button"
+                                >
+                                  Next
+                                </Button>
+                              ) : (
+                                <Button
+                                  onClick={handleSubmit}
+                                  isDisabled={!isFormValid()}
+                                  isLoading={isLoading}
+                                  color="primary"
+                                  type="button"
+                                >
+                                  {isLoading ? "Création en cours..." : "Créer l'Événement"}
+                                </Button>
+                              )}
+                            </ModalFooter>
+                          </>
+                        )}
+                      </ModalContent>
+                    </Modal>
+                  </div>
+                </section>
+
+              </Tab>
+            </Tabs>
           ) : (
-              <section className="py-8 md:py-10">
-                <div className="w-full max-w-7xl mx-auto px-4">
-                  
+            <section className="py-8 md:py-10">
+              <div className="w-full max-w-7xl mx-auto px-4">
 
-                  {/* Error display */}
-                  {error && (
-                    <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-                      {error}
-                    </div>
-                  )}
 
-                  {/* Loading state */}
-                  {isLoading && !events.length ? (
-                    <div className="text-center py-8">
-                      <p>Loading events...</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
-                      {events
-                        .filter((event) =>
-                          event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          event.description.toLowerCase().includes(searchTerm.toLowerCase())
-                        )
-                        .map((event) => (
-                          <EventCard key={event.id} event={event} />
-                        ))}
+                {/* Error display */}
+                {error && (
+                  <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                    {error}
+                  </div>
+                )}
 
-                      {/* {events.filter((event) =>
+                {/* Loading state */}
+                {isLoading && !events.length ? (
+                  <div className="text-center py-8">
+                    <p>Chargement des événements...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
+                    {events
+                      .filter((event) =>
                         event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         event.description.toLowerCase().includes(searchTerm.toLowerCase())
-                      ).length === 0 && (
-                          <div className="col-span-full text-center py-8 text-gray-500">
-                            No events match your search.
+                      )
+                      .map((event) => (
+                        <EventCard key={event.id} event={event} />
+                      ))}
+
+                  </div>
+
+                )}
+
+                {/* Modal */}
+                <Modal isOpen={isOpen} onOpenChange={handleModalClose} size="2xl">
+                  <ModalContent className="max-h-[90vh] overflow-hidden flex flex-col">
+                    {() => (
+                      <>
+                        <ModalHeader className="flex flex-col gap-4 pb-4">
+                          <div className="flex flex-col gap-1">
+                            <h2 className="text-lg font-semibold">Créer l'Événement</h2>
+                            <span className="text-default-500 text-sm">
+                              Step {currentStep + 1} of {steps.length}:{" "}
+                              {steps[currentStep]}
+                            </span>
                           </div>
-                        )} */}
-                    </div>
 
-                  )}
-
-                  {/* Modal */}
-                  <Modal isOpen={isOpen} onOpenChange={handleModalClose} size="2xl">
-                    <ModalContent className="max-h-[90vh] overflow-hidden flex flex-col">
-                      {() => (
-                        <>
-                          <ModalHeader className="flex flex-col gap-4 pb-4">
-                            <div className="flex flex-col gap-1">
-                              <h2 className="text-lg font-semibold">Create Event</h2>
-                              <span className="text-default-500 text-sm">
-                                Step {currentStep + 1} of {steps.length}:{" "}
-                                {steps[currentStep]}
-                              </span>
-                            </div>
-
-                            {/* Step Progress Slider */}
-                            <div className="w-full">
-                              <div className="flex justify-between items-center mb-2">
-                                {steps.map((step, index) => (
-                                  <div
-                                    key={step}
-                                    className={`flex items-center ${index < steps.length - 1 ? "flex-1" : ""
-                                      }`}
-                                  >
-                                    <div className="flex flex-col items-center">
-                                      <div
-                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${index < currentStep
-                                          ? "bg-success text-white" // Completed steps
-                                          : index === currentStep
-                                            ? "bg-primary text-white" // Current step
-                                            : "bg-default-200 text-default-500" // Future steps
-                                          }`}
-                                      >
-                                        {index < currentStep ? (
-                                          <svg
-                                            className="w-4 h-4"
-                                            fill="currentColor"
-                                            viewBox="0 0 20 20"
-                                          >
-                                            <path
-                                              fillRule="evenodd"
-                                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                              clipRule="evenodd"
-                                            />
-                                          </svg>
-                                        ) : (
-                                          index + 1
-                                        )}
-                                      </div>
-                                      <span
-                                        className={`text-xs mt-1 text-center max-w-20 ${index === currentStep
-                                          ? "text-primary font-medium"
-                                          : "text-default-500"
-                                          }`}
-                                      >
-                                        {step}
-                                      </span>
-                                    </div>
-                                    {index < steps.length - 1 && (
-                                      <div className="flex-1 mx-2">
-                                        <div
-                                          className={`h-0.5 transition-all duration-200 ${index < currentStep
-                                            ? "bg-success"
-                                            : "bg-default-200"
-                                            }`}
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-
-                              {/* Progress Bar */}
-                              <div className="w-full bg-default-200 rounded-full h-1">
+                          {/* Step Progress Slider */}
+                          <div className="w-full">
+                            <div className="flex justify-between items-center mb-2">
+                              {steps.map((step, index) => (
                                 <div
-                                  className="bg-primary h-1 rounded-full transition-all duration-300 ease-out"
-                                  style={{
-                                    width: `${(currentStep / (steps.length - 1)) * 100}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </ModalHeader>
-                          <ModalBody className="overflow-y-auto px-4 flex-1">
-                            <div className="flex flex-col gap-4">
-                              {currentStep === 0 && (
-                                <>
-                                  <Input
-                                    label="Event Name"
-                                    name="title"
-                                    placeholder="Enter event name"
-                                    required
-                                    value={formData.title}
-                                    onChange={handleChange}
-                                    isDisabled={isLoading}
-                                  />
-
-                                  <div className="flex flex-col gap-2">
-                                    <Input
-                                      label="Event Image"
-                                      type="file"
-                                      name="image"
-                                      accept="image/*"
-                                      onChange={handleFileChange}
-                                      isDisabled={isLoading}
-                                      description="Select an image file for the event banner"
-                                      isRequired
-                                    />
-                                    {formData.image && (
-                                      <div className="text-sm text-gray-600">
-                                        Selected: {formData.image.name}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <Input
-                                    label="Event Caption"
-                                    name="caption"
-                                    placeholder="Enter Event caption"
-                                    required
-                                    value={formData.caption || ""}
-                                    onChange={handleChange}
-                                    isDisabled={isLoading}
-                                    description="Brief description of the event"
-                                  />
-
-                                  <div className="flex gap-4">
-                                    <DatePicker
-                                      label="Start Date"
-                                      value={formData.start_date}
-                                      onChange={handleStartDateChange}
-                                      isDisabled={isLoading}
-                                      isRequired
-                                    />
-                                    <DatePicker
-                                      label="End Date"
-                                      value={formData.end_date}
-                                      onChange={handleEndDateChange}
-                                      isDisabled={isLoading}
-                                      isRequired
-                                    />
-                                  </div>
-
-                                  <div className="flex flex-row gap-4">
-                                    <NumberInput
-                                      label="Number of Recruiters"
-                                      className="flex-1"
-                                      placeholder="1"
-                                      value={formData.recruiters_number || 1}
-                                      onValueChange={handleRecruitersNumberChange}
-                                      isDisabled={isLoading}
-                                      min={1}
-                                      max={20}
-                                      step={1}
-                                      description="Number of recruiters for this event"
-                                      isRequired
-                                    />
-                                    <div className="flex items-center -mt-6">
-                                      <Switch
-                                        isSelected={formData.is_online || false}
-                                        onValueChange={handleOnlineEventChange}
-                                        isDisabled={isLoading}
-                                      >
-                                        Online Event
-                                      </Switch>
+                                  key={step}
+                                  className={`flex items-center ${index < steps.length - 1 ? "flex-1" : ""
+                                    }`}
+                                >
+                                  <div className="flex flex-col items-center">
+                                    <div
+                                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${index < currentStep
+                                        ? "bg-success text-white" // Completed steps
+                                        : index === currentStep
+                                          ? "bg-primary text-white" // Current step
+                                          : "bg-default-200 text-default-500" // Future steps
+                                        }`}
+                                    >
+                                      {index < currentStep ? (
+                                        <svg
+                                          className="w-4 h-4"
+                                          fill="currentColor"
+                                          viewBox="0 0 20 20"
+                                        >
+                                          <path
+                                            fillRule="evenodd"
+                                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                            clipRule="evenodd"
+                                          />
+                                        </svg>
+                                      ) : (
+                                        index + 1
+                                      )}
                                     </div>
+                                    <span
+                                      className={`text-xs mt-1 text-center max-w-20 ${index === currentStep
+                                        ? "text-primary font-medium"
+                                        : "text-default-500"
+                                        }`}
+                                    >
+                                      {step}
+                                    </span>
                                   </div>
-
-                                  {formData.is_online ? (
-                                    <Input
-                                      label="Meeting Link"
-                                      name="meeting_link"
-                                      placeholder="Enter meeting link (Zoom, Teams, etc.)"
-                                      required
-                                      value={formData.meeting_link || ""}
-                                      onChange={handleChange}
-                                      isDisabled={isLoading}
-                                    />
-                                  ) : (
-                                    <Input
-                                      label="Location"
-                                      name="location"
-                                      placeholder="Enter event location"
-                                      required
-                                      value={formData.location || ""}
-                                      onChange={handleChange}
-                                      isDisabled={isLoading}
-                                    />
+                                  {index < steps.length - 1 && (
+                                    <div className="flex-1 mx-2">
+                                      <div
+                                        className={`h-0.5 transition-all duration-200 ${index < currentStep
+                                          ? "bg-success"
+                                          : "bg-default-200"
+                                          }`}
+                                      />
+                                    </div>
                                   )}
-                                </>
-                              )}
+                                </div>
+                              ))}
+                            </div>
 
-                              {currentStep === 1 && (
-                                <div>
-                                  <label className="block text-sm font-medium mb-1">
-                                    Description *
-                                  </label>
-                                  <ReactQuill
-                                    value={formData.description}
-                                    onChange={(value) =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        description: value,
-                                      }))
-                                    }
-                                    className="h-screen"
-                                    modules={{
-                                      toolbar: {
-                                        container: [
-                                          [{ header: [1, 2, false] }],
-                                          ["bold", "italic", "underline", "strike"],
-                                          ["blockquote", "code-block"],
-                                          [{ list: "ordered" }, { list: "bullet" }],
-                                          ["link", "image", "video"],
-                                          ["clean"],
-                                        ],
-                                      },
-                                    }}
-                                    formats={[
-                                      "header",
-                                      "bold",
-                                      "italic",
-                                      "underline",
-                                      "strike",
-                                      "blockquote",
-                                      "code-block",
-                                      "list",
-                                      "bullet",
-                                      "link",
-                                      "image",
-                                      "video",
-                                    ]}
-                                    readOnly={isLoading}
+                            {/* Progress Bar */}
+                            <div className="w-full bg-default-200 rounded-full h-1">
+                              <div
+                                className="bg-primary h-1 rounded-full transition-all duration-300 ease-out"
+                                style={{
+                                  width: `${(currentStep / (steps.length - 1)) * 100}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </ModalHeader>
+                        <ModalBody className="overflow-y-auto px-4 flex-1">
+                          <div className="flex flex-col gap-4">
+                            {currentStep === 0 && (
+                              <>
+                                <Input
+                                  label="Nom de l'Événement"
+                                  name="title"
+                                  placeholder="Entrez le nom de l'événement"
+                                  required
+                                  value={formData.title}
+                                  onChange={handleChange}
+                                  isDisabled={isLoading}
+                                />
+
+                                <div className="flex flex-col gap-2">
+                                  <Input
+                                    label="Image de l'Événement"
+                                    type="file"
+                                    name="image"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                    isDisabled={isLoading}
+                                    description="Sélectionnez un fichier image pour la bannière de l'événement"
+                                    isRequired
+                                  />
+                                  {formData.image && (
+                                    <div className="text-sm text-gray-600">
+                                      Selected: {formData.image.name}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <Input
+                                  label="Légende de l'Événement"
+                                  name="caption"
+                                  placeholder="Entrez la légende de l'événement"
+                                  required
+                                  value={formData.caption || ""}
+                                  onChange={handleChange}
+                                  isDisabled={isLoading}
+                                  description="Brève description de l'événement"
+                                />
+
+                                <div className="flex gap-4">
+                                  <DatePicker
+                                    label="Date de début"
+                                    value={formData.start_date}
+                                    onChange={handleStartDateChange}
+                                    isDisabled={isLoading}
+                                    isRequired
+                                  />
+                                  <DatePicker
+                                    label="Date de fin"
+                                    value={formData.end_date}
+                                    onChange={handleEndDateChange}
+                                    isDisabled={isLoading}
+                                    isRequired
                                   />
                                 </div>
-                              )}
 
-                              {currentStep === 2 && (
-                                <>
-                                  <div className="flex items-center gap-2">
+                                <div className="flex flex-row gap-4">
+                                  <NumberInput
+                                    label="Nombre de Recruteurs"
+                                    className="flex-1"
+                                    placeholder="1"
+                                    value={formData.recruiters_number || 1}
+                                    onValueChange={handleRecruitersNumberChange}
+                                    isDisabled={isLoading}
+                                    min={1}
+                                    max={20}
+                                    step={1}
+                                    description="Nombre de recruteurs pour cet événement"
+                                    isRequired
+                                  />
+                                  <div className="flex items-center -mt-6">
                                     <Switch
-                                      isSelected={formData.is_timeSlot_enabled}
-                                      onValueChange={handleSwitchChange}
+                                      isSelected={formData.is_online || false}
+                                      onValueChange={handleOnlineEventChange}
                                       isDisabled={isLoading}
                                     >
-                                      Enable Appointments
+                                      Online Event
                                     </Switch>
                                   </div>
+                                </div>
 
-                                  {formData.is_timeSlot_enabled && (
-                                    <div className="border-t pt-4 mt-2">
-                                      <h4 className="text-sm font-medium text-gray-700 mb-3">
-                                        Time Slot Configuration
-                                      </h4>
-                                      <div className="space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                          <TimeInput
-                                            label="Start Time"
-                                            onChange={handleStartTimeChange}
-                                            isDisabled={isLoading}
-                                            isRequired
-                                            hourCycle={24}
-                                            description="Appointment start time"
-                                          />
-                                          <TimeInput
-                                            label="End Time"
-                                            onChange={handleEndTimeChange}
-                                            isDisabled={isLoading}
-                                            isRequired
-                                            hourCycle={24}
-                                            description="Appointment end time"
-                                          />
-                                        </div>
-                                        <NumberInput
-                                          label="Slot Duration (minutes)"
-                                          placeholder="10"
-                                          value={timeSlotData.slot}
-                                          onValueChange={handleSlotChange}
+                                {formData.is_online ? (
+                                  <Input
+                                    label="Lien de Réunion"
+                                    name="meeting_link"
+                                    placeholder="Entrez le lien de réunion (Zoom, Teams, etc.)"
+                                    required
+                                    value={formData.meeting_link || ""}
+                                    onChange={handleChange}
+                                    isDisabled={isLoading}
+                                  />
+                                ) : (
+                                  <Input
+                                    label="Lieu"
+                                    name="location"
+                                    placeholder="Entrez le lieu de l'événement"
+                                    required
+                                    value={formData.location || ""}
+                                    onChange={handleChange}
+                                    isDisabled={isLoading}
+                                  />
+                                )}
+                              </>
+                            )}
+
+                            {currentStep === 1 && (
+                              <div>
+                                <label className="block text-sm font-medium mb-1">
+                                  Description *
+                                </label>
+                                <ReactQuill
+                                  value={formData.description}
+                                  onChange={(value) =>
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      description: value,
+                                    }))
+                                  }
+                                  className="h-screen"
+                                  modules={{
+                                    toolbar: {
+                                      container: [
+                                        [{ header: [1, 2, false] }],
+                                        ["bold", "italic", "underline", "strike"],
+                                        ["blockquote", "code-block"],
+                                        [{ list: "ordered" }, { list: "bullet" }],
+                                        ["link", "image", "video"],
+                                        ["clean"],
+                                      ],
+                                    },
+                                  }}
+                                  formats={[
+                                    "header",
+                                    "bold",
+                                    "italic",
+                                    "underline",
+                                    "strike",
+                                    "blockquote",
+                                    "code-block",
+                                    "list",
+                                    "bullet",
+                                    "link",
+                                    "image",
+                                    "video",
+                                  ]}
+                                  readOnly={isLoading}
+                                />
+                              </div>
+                            )}
+
+                            {currentStep === 2 && (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    isSelected={formData.is_timeSlot_enabled}
+                                    onValueChange={handleSwitchChange}
+                                    isDisabled={isLoading}
+                                  >
+                                    Activer les Rendez-vous
+                                  </Switch>
+                                </div>
+
+                                {formData.is_timeSlot_enabled && (
+                                  <div className="border-t pt-4 mt-2">
+                                    <h4 className="text-sm font-medium text-gray-700 mb-3">
+                                      Configuration des Créneaux Horaires
+                                    </h4>
+                                    <div className="space-y-4">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <TimeInput
+                                          label="Date de début"
+                                          onChange={handleStartTimeChange}
                                           isDisabled={isLoading}
-                                          min={5}
-                                          max={120}
-                                          step={5}
-                                          description="Duration of each time slot in minutes"
+                                          isRequired
+                                          hourCycle={24}
+                                          description="Heure de début du rendez-vous"
+                                        />
+                                        <TimeInput
+                                          label="Date de fin"
+                                          onChange={handleEndTimeChange}
+                                          isDisabled={isLoading}
+                                          isRequired
+                                          hourCycle={24}
+                                          description="Heure de fin du rendez-vous"
                                         />
                                       </div>
+                                      <NumberInput
+                                        label="Durée du Créneau (minutes)"
+                                        placeholder="10"
+                                        value={timeSlotData.slot}
+                                        onValueChange={handleSlotChange}
+                                        isDisabled={isLoading}
+                                        min={5}
+                                        max={120}
+                                        step={5}
+                                        description="Duration of each time slot in minutes"
+                                      />
                                     </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </ModalBody>
-                          <ModalFooter className="sticky bottom-0 bg-white z-10">
-                            {currentStep > 0 && (
-                              <Button onClick={handlePreviousStep} type="button">
-                                Previous
-                              </Button>
+                                  </div>
+                                )}
+                              </>
                             )}
-                            {currentStep < steps.length - 1 ? (
-                              <Button
-                                onClick={handleNextStep}
-                                isDisabled={!isStepValid(currentStep)}
-                                color="primary"
-                                variant="flat"
-                                type="button"
-                              >
-                                Next
-                              </Button>
-                            ) : (
-                              <Button
-                                onClick={handleSubmit}
-                                isDisabled={!isFormValid()}
-                                isLoading={isLoading}
-                                color="primary"
-                                type="button"
-                              >
-                                {isLoading ? "Creating..." : "Create Event"}
-                              </Button>
-                            )}
-                          </ModalFooter>
-                        </>
-                      )}
-                    </ModalContent>
-                  </Modal>
-                </div>
-              </section>
-             )}
+                          </div>
+                        </ModalBody>
+                        <ModalFooter className="sticky bottom-0 bg-white z-10">
+                          {currentStep > 0 && (
+                            <Button onClick={handlePreviousStep} type="button">
+                              Précédent
+                            </Button>
+                          )}
+                          {currentStep < steps.length - 1 ? (
+                            <Button
+                              onClick={handleNextStep}
+                              isDisabled={!isStepValid(currentStep)}
+                              color="primary"
+                              variant="flat"
+                              type="button"
+                            >
+                              Suivant
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={handleSubmit}
+                              isDisabled={!isFormValid()}
+                              isLoading={isLoading}
+                              color="primary"
+                              type="button"
+                            >
+                              {isLoading ? "Création en cours..." : "Créer l'Événement"}
+                            </Button>
+                          )}
+                        </ModalFooter>
+                      </>
+                    )}
+                  </ModalContent>
+                </Modal>
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </DefaultLayout >
