@@ -623,7 +623,7 @@ const Signup: React.FC = () => {
 
             <div style={styles.footer}>
               <p style={styles.footerText}>
-                Déjà inscrit? <Link to="/" style={styles.link}>Se connecter</Link>
+                Déjà inscrit? <Link to="/events" style={styles.link}>Se connecter</Link>
               </p>
             </div>
           </>

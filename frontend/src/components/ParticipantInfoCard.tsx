@@ -133,7 +133,7 @@ const InfoCard = ({ icon: Icon, title, value, color }: {
                                     <div className="bg-purple-500 rounded-lg p-2">
                                         <Clock size={16} className="text-white" />
                                     </div>
-                                    <span className="text-sm font-semibold text-purple-800">Interview Time</span>
+                                    <span className="text-sm font-semibold text-purple-800">Heure de l'Entretien</span>
                                 </div>
                                 <p className="text-base font-bold text-purple-900 ml-11">
                                     {new Date(participant.rdv).toLocaleString("fr-FR")}
@@ -145,7 +145,7 @@ const InfoCard = ({ icon: Icon, title, value, color }: {
                                     <div className="bg-blue-500 rounded-lg p-2">
                                         <Calendar size={16} className="text-white" />
                                     </div>
-                                    <span className="text-sm font-semibold text-blue-800">Registration Date</span>
+                                    <span className="text-sm font-semibold text-blue-800">Date d'Inscription</span>
                                 </div>
                                 <p className="text-base font-bold text-blue-900 ml-11">
                                     {formatDate(participant.date_inscription)}
