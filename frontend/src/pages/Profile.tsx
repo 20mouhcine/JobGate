@@ -982,7 +982,7 @@ const Profile = () => {
                     <input
                       type="text"
                       name="etablissement"
-                      value={editedUser.etablissement || ''}
+                      value={formData?.etablissement || ''}
                       onChange={handleChange}
                       style={styles.input}
                       placeholder="Nom de votre établissement"
@@ -998,7 +998,7 @@ const Profile = () => {
                     <input
                       type="text"
                       name="filiere"
-                      value={editedUser.filiere || ''}
+                      value={formData?.filiere || ''}
                       onChange={handleChange}
                       style={styles.input}
                       placeholder="Votre filière d'étude"

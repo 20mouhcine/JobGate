@@ -423,7 +423,7 @@ export default function ParticipantDetailsPage() {
                     {/* Rating */}
                     <div className="p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
                       <label className="block text-sm font-medium text-gray-700 mb-3">
-                        Overall Rating
+                        Évaluation globale
                       </label>
                       <StarRating
                         rating={formData.note}

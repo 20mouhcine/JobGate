@@ -471,7 +471,7 @@ export default function EventsPage() {
                     <div className="flex justify-between items-center mb-6">
                       <Input
                         className="w-auto max-w-xs"
-                        placeholder="Search events..."
+                        placeholder="Rechercher..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
