@@ -76,10 +76,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     phone = serializers.CharField(required=False, allow_blank=True)
     etablissement = serializers.CharField(required=False, allow_blank=True, write_only=True)
     filiere = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    resume = serializers.FileField(required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'email', 'password', 'password_confirm', 'role', 'phone', 'etablissement', 'filiere']
+        fields = ['first_name', 'last_name', 'email', 'password', 'password_confirm', 'role', 'phone', 'etablissement', 'filiere','resume']
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
@@ -92,6 +93,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         # Extract fields that don't belong to User model
         etablissement = validated_data.pop('etablissement', '')
         filiere = validated_data.pop('filiere', '')
+        resume = validated_data.pop('resume', None)
+
         
         # Set username for AbstractUser compatibility
         validated_data['username'] = f"{validated_data['first_name']} {validated_data['last_name']}"
@@ -107,7 +110,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 email=user.email,
                 phone=user.phone,
                 etablissement=etablissement,
-                filiere=filiere
+                filiere=filiere,
+                resume=resume
             )
         else:
             Recruiter.objects.create(

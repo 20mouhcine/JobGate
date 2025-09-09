@@ -18,30 +18,38 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     }
   }, []);
 
-  const fetchUserData = async (token: string) => {
-    try {
-      const response = await fetch('http://localhost:8000/api/auth/profile/', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+const fetchUserData = async (token: string) => {
+  try {
+    const response = await fetch('http://localhost:8000/api/auth/profile/', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-      if (response.ok) {
-        const userData = await response.json();
-        setUserState(userData);
-      } else {
-        // Token is invalid, remove it
-        localStorage.removeItem('authToken');
-      }
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-      localStorage.removeItem('authToken');
-    } finally {
+    if (response.status === 401) {
+      // Token expiré ou invalide
+      localStorage.removeItem('access_token');
+      setUserState(null);
       setIsLoading(false);
+      return;
     }
-  };
+
+    if (response.ok) {
+      const userData = await response.json();
+      setUserState(userData);
+    } else {
+      // Token invalide, le supprimer
+      localStorage.removeItem('access_token');
+    }
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    localStorage.removeItem('access_token');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const setUser = (newUser: User | null) => {
     setUserState(newUser);

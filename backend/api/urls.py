@@ -1,5 +1,7 @@
 from django.urls import path, include
-from .views import EventView, EventDetailView, TalentView,TalentDetailView, ParticipationView, ParticipationDetailView, TimeSlotView, FileUploadView,ParticipationsEventView, EventStatisticsView, RDVReminderView, SendSelectionEmailView
+from django.conf import settings
+from django.conf.urls.static import static
+from .views import EventView, EventDetailView, TalentView,TalentDetailView, ParticipationView, ParticipationDetailView, TimeSlotView, FileUploadView,ParticipationsEventView, EventStatisticsView, RDVReminderView, SendSelectionEmailView,UserEventsView
 
 urlpatterns = [
     # Authentication URLs
@@ -19,6 +21,7 @@ urlpatterns = [
     path('participations/', ParticipationView.as_view(), name='participation-list-create'),
     path('participations-details/', ParticipationDetailView.as_view(), name='participation-detail'),
     path('participations/<int:pk>/', ParticipationsEventView.as_view(), name='participation-detail-by-event_id'),
+    path('user/<int:user_id>/events/', UserEventsView.as_view(), name='user-events'),
 
     # Time Slot URLs
     path('time-slots/', TimeSlotView.as_view(), name='time-slot-list-create'),
@@ -27,3 +30,5 @@ urlpatterns = [
     path('send-rdv-reminders/', RDVReminderView.as_view(), name='send-rdv-reminders'),
     path('upload/', FileUploadView.as_view(), name='file-upload'),
 ]
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

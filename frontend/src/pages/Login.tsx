@@ -35,7 +35,8 @@ const Login: React.FC = () => {
       
       if (success) {
         // Connexion réussie - rediriger vers la page précédente ou dashboard
-        navigate(-1);
+        // navigate(-1);
+        navigate('/events')
       } else {
         setErrorMessage('Email ou mot de passe incorrect');
       }

@@ -19,6 +19,7 @@ const Signup: React.FC = () => {
     etablissement: '',
     filiere: '',
   });
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
   const [signupSuccess, setSignupSuccess] = useState<boolean>(false);
@@ -35,6 +36,27 @@ const Signup: React.FC = () => {
     }));
     // Effacer les messages d'erreur lorsque l'utilisateur modifie le formulaire
     if (errorMessage) setErrorMessage('');
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type (PDF, DOC, DOCX)
+      const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      if (!allowedTypes.includes(file.type)) {
+        setErrorMessage('Veuillez sélectionner un fichier PDF, DOC ou DOCX');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setErrorMessage('Le fichier ne doit pas dépasser 5MB');
+        return;
+      }
+      
+      setResumeFile(file);
+      if (errorMessage) setErrorMessage('');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,23 +80,26 @@ const Signup: React.FC = () => {
     setErrorMessage('');
 
     try {
+      // Create FormData for file upload
+      const formDataToSend = new FormData();
+      formDataToSend.append('first_name', formData.firstName);
+      formDataToSend.append('last_name', formData.lastName);
+      formDataToSend.append('email', formData.email);
+      formDataToSend.append('password', formData.password);
+      formDataToSend.append('password_confirm', formData.confirmPassword);
+      formDataToSend.append('phone', formData.phone || '');
+      formDataToSend.append('etablissement', formData.etablissement || '');
+      formDataToSend.append('filiere', formData.filiere || '');
+      formDataToSend.append('role', 'talent');
+      
+      if (resumeFile) {
+        formDataToSend.append('resume', resumeFile);
+      }
+
       // Envoi de la requête à l'API locale
       const response = await fetch('http://localhost:8000/api/auth/register/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          email: formData.email,
-          password: formData.password,
-          password_confirm: formData.confirmPassword,
-          phone: formData.phone,
-          etablissement: formData.etablissement,
-          filiere: formData.filiere,
-          role: 'talent',
-        }),
+        body: formDataToSend, // Don't set Content-Type header, let browser set it with boundary
       });
 
       const data = await response.json();
@@ -88,7 +113,7 @@ const Signup: React.FC = () => {
         setTimeout(async () => {
           const loginSuccess = await login(formData.email, formData.password);
           if (loginSuccess) {
-            navigate('/dashboard'); // ou toute autre page
+            navigate('/events'); // ou toute autre page
           }
         }, 2000);
       } else {
@@ -169,6 +194,31 @@ const Signup: React.FC = () => {
       width: '100%',
       boxSizing: 'border-box',
       paddingRight: '45px',
+    } as React.CSSProperties,
+    fileInput: {
+      padding: '15px',
+      border: '1px solid #ddd',
+      borderRadius: '8px',
+      fontSize: '16px',
+      transition: 'all 0.3s ease',
+      background: '#fff',
+      width: '100%',
+      boxSizing: 'border-box',
+      cursor: 'pointer',
+    } as React.CSSProperties,
+    fileInputLabel: {
+      marginBottom: '8px',
+      fontWeight: 500,
+      color: '#444',
+      fontSize: '14px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '5px',
+    } as React.CSSProperties,
+    fileInfo: {
+      fontSize: '12px',
+      color: '#666',
+      marginTop: '5px',
     } as React.CSSProperties,
     passwordContainer: {
       position: 'relative',
@@ -338,6 +388,14 @@ const Signup: React.FC = () => {
           />
         </>
       )}
+    </svg>
+  );
+
+  // File icon SVG
+  const FileIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 
@@ -583,6 +641,30 @@ const Signup: React.FC = () => {
                       required
                       style={styles.input}
                     />
+                  </div>
+
+                  <div style={styles.inputGroup}>
+                    <label htmlFor="resume" style={styles.fileInputLabel}>
+                      <FileIcon />
+                      CV
+                    </label>
+                    <input
+                      type="file"
+                      id="resume"
+                      name="resume"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleFileChange}
+                      style={styles.fileInput}
+                    />
+                    <div style={styles.fileInfo}>
+                      {resumeFile ? (
+                        <span style={{ color: '#4a6cf7' }}>
+                          ✓ {resumeFile.name} ({(resumeFile.size / 1024 / 1024).toFixed(2)} MB)
+                        </span>
+                      ) : (
+                        <span>Formats acceptés: PDF, DOC, DOCX (max. 5MB)</span>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
